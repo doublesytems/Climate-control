@@ -1,7 +1,7 @@
 {
   "domain": "smart_climate",
   "name": "Smart Climate",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "documentation": "https://github.com/doublesytems/Climate-control",
   "issue_tracker": "https://github.com/doublesytems/Climate-control/issues",
   "dependencies": [],
