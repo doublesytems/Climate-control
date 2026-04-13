@@ -196,8 +196,7 @@ def _register_services(hass: HomeAssistant) -> None:
 # ---------------------------------------------------------------------------
 
 async def _handle_set_boost(call: ServiceCall) -> None:
-    hass = call.hass if hasattr(call, "hass") else _get_hass_from_call(call)
-    entity = _get_climate_entity(hass, call)
+    entity = _get_climate_entity(call.hass, call)
     await entity.async_activate_boost(
         duration=call.data.get(ATTR_BOOST_DURATION),
         target=call.data.get(ATTR_BOOST_TARGET),
