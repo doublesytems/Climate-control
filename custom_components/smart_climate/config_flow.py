@@ -314,7 +314,7 @@ class SmartClimateConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> "SmartClimateOptionsFlow":
-        return SmartClimateOptionsFlow(config_entry)
+        return SmartClimateOptionsFlow()
 
 
 # ---------------------------------------------------------------------------
@@ -324,8 +324,7 @@ class SmartClimateConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class SmartClimateOptionsFlow(config_entries.OptionsFlow):
     """Options flow — allows changing settings without re-adding."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self.config_entry = config_entry
+    def __init__(self) -> None:
         self._data: dict[str, Any] = {}
 
     async def async_step_init(
