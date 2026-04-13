@@ -1,0 +1,131 @@
+set_boost:
+  name: Boost activeren
+  description: >
+    Activeer de boost-modus voor een bepaalde tijd op een bepaalde temperatuur.
+    Na afloop wordt het vorige preset hersteld.
+  target:
+    entity:
+      domain: climate
+      integration: smart_climate
+  fields:
+    duration:
+      name: Duur (minuten)
+      description: Hoe lang de boost actief blijft (standaard = configuratiewaarde).
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 480
+          step: 1
+          unit_of_measurement: min
+    target_temperature:
+      name: Doeltemperatuur
+      description: Temperatuur tijdens boost (standaard = preset boosttemperatuur).
+      required: false
+      selector:
+        number:
+          min: 15
+          max: 35
+          step: 0.5
+          unit_of_measurement: "°C"
+
+clear_boost:
+  name: Boost annuleren
+  description: Annuleer de actieve boost-modus en herstel het vorige preset.
+  target:
+    entity:
+      domain: climate
+      integration: smart_climate
+
+set_vacation:
+  name: Vakantiestand activeren
+  description: >
+    Activeer vakantiestand tussen twee datums.
+    De thermostaat houdt de ruimte op een lage (vorstvrije) temperatuur.
+  target:
+    entity:
+      domain: climate
+      integration: smart_climate
+  fields:
+    start_date:
+      name: Startdatum
+      description: Eerste dag van de vakantie (YYYY-MM-DD).
+      required: true
+      selector:
+        date:
+    end_date:
+      name: Einddatum
+      description: Laatste dag van de vakantie (YYYY-MM-DD).
+      required: true
+      selector:
+        date:
+    temperature:
+      name: Vorstvrije temperatuur
+      description: Streeftemperatuur tijdens vakantie.
+      required: false
+      default: 12
+      selector:
+        number:
+          min: 5
+          max: 18
+          step: 0.5
+          unit_of_measurement: "°C"
+
+clear_vacation:
+  name: Vakantiestand annuleren
+  description: Annuleer de vakantiestand en herstel normale besturing.
+  target:
+    entity:
+      domain: climate
+      integration: smart_climate
+
+set_schedule:
+  name: Weekschema instellen
+  description: >
+    Stel een volledig weekschema in als een lijst van tijdblokken.
+    Elk blok bevat dagen, starttijd en preset.
+    Voorbeeld entry: {"days": [0,1,2,3,4], "start": "07:00", "preset": "comfort"}
+  target:
+    entity:
+      domain: climate
+      integration: smart_climate
+  fields:
+    entries:
+      name: Tijdblokken
+      description: >
+        Lijst van schema-items. Velden per item:
+        - days: lijst van weekdagnummers (0=ma … 6=zo)
+        - start: starttijd "HH:MM"
+        - preset: comfort | eco | sleep | away
+      required: true
+      selector:
+        object:
+
+clear_schedule:
+  name: Weekschema wissen
+  description: Verwijder het volledige weekschema.
+  target:
+    entity:
+      domain: climate
+      integration: smart_climate
+
+trigger_pump_exercise:
+  name: Pompbeweging activeren
+  description: >
+    Activeer handmatig een anti-vastloop run van de circulatiepomp.
+    De pomp draait voor de opgegeven duur ongeacht de zonestatus.
+  target:
+    entity:
+      domain: switch
+      integration: smart_climate
+  fields:
+    duration:
+      name: Duur (minuten)
+      description: Hoe lang de pomp draait (standaard = anti-vastloop instelling).
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 120
+          step: 1
+          unit_of_measurement: min

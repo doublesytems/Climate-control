@@ -1,0 +1,138 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Smart Climate — device",
+        "description": "Select the temperature sensor and the heating/cooling entities.",
+        "data": {
+          "target_sensor": "Temperature sensor (indoor)",
+          "heater": "Heater entity (switch or climate)",
+          "cooler": "Cooler entity (switch or climate)",
+          "outside_sensor": "Outside temperature sensor (optional)",
+          "ac_mode": "AC mode (heater entity also used for cooling)"
+        }
+      },
+      "algorithm": {
+        "title": "Algorithm & basic parameters",
+        "data": {
+          "algorithm": "Control algorithm",
+          "target_temp": "Initial target temperature (°C)",
+          "min_temp": "Minimum temperature (°C)",
+          "max_temp": "Maximum temperature (°C)",
+          "cold_tolerance": "Cold tolerance (°C)",
+          "hot_tolerance": "Hot tolerance (°C)",
+          "min_cycle_duration": "Minimum cycle duration (seconds)",
+          "keep_alive": "Keep-alive interval (seconds)"
+        }
+      },
+      "pid": {
+        "title": "PID parameters",
+        "description": "Start with defaults and tune based on room behaviour.",
+        "data": {
+          "pid_kp": "Proportional gain (Kp)",
+          "pid_ki": "Integral gain (Ki)",
+          "pid_kd": "Derivative gain (Kd)"
+        }
+      },
+      "presets": {
+        "title": "Preset temperatures",
+        "description": "Set the target temperature for each preset.",
+        "data": {
+          "preset_comfort_temp": "Comfort (°C)",
+          "preset_eco_temp": "Eco (°C)",
+          "preset_sleep_temp": "Sleep (°C)",
+          "preset_away_temp": "Away (°C)",
+          "preset_boost_temp": "Boost (°C)",
+          "boost_duration": "Boost duration (minutes)"
+        }
+      },
+      "pump": {
+        "title": "Floor heating pump",
+        "description": "Configure the circulation pump. Leave 'pump entity' empty if you don't have one. Kincony KC868-A6: add the relay as a switch entity via ESPHome.",
+        "data": {
+          "pump_entity": "Pump relay entity (switch)",
+          "pump_zone_entities": "Zone entities to monitor (valves / thermostats)",
+          "pump_anti_seize_interval_h": "Anti-seize interval (hours)",
+          "pump_anti_seize_duration_min": "Anti-seize duration (minutes)",
+          "pump_post_heat_delay_min": "Post-heat run time (minutes)",
+          "pump_min_run_time_sec": "Minimum run time (seconds)",
+          "pump_exercise_time": "Preferred exercise time (HH:MM)",
+          "learning_enabled": "Enable self-learning algorithm",
+          "early_start": "Enable Early Start (Tado-style)"
+        }
+      },
+      "advanced": {
+        "title": "Advanced options",
+        "data": {
+          "presence_sensors": "Presence sensors (persons / device trackers)",
+          "window_detection": "Enable window detection",
+          "window_temp_drop": "Temperature drop threshold (°C)",
+          "window_temp_drop_time": "Time window for drop (minutes)",
+          "window_open_duration": "Pause duration after detection (minutes)",
+          "weather_compensation": "Enable weather compensation",
+          "weather_slope": "Weather compensation slope (°C/°C)",
+          "weather_outside_ref": "Reference outside temperature (°C)",
+          "heater_watt": "Heater power (Watt)",
+          "cooler_watt": "Cooler power (Watt)"
+        }
+      }
+    },
+    "error": {
+      "no_actuator": "Provide at least one heater or cooler entity.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This device is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Algorithm & PID",
+        "data": {
+          "algorithm": "Control algorithm",
+          "cold_tolerance": "Cold tolerance (°C)",
+          "hot_tolerance": "Hot tolerance (°C)",
+          "pid_kp": "Kp",
+          "pid_ki": "Ki",
+          "pid_kd": "Kd"
+        }
+      },
+      "presets_opt": {
+        "title": "Preset temperatures",
+        "data": {
+          "preset_comfort_temp": "Comfort (°C)",
+          "preset_eco_temp": "Eco (°C)",
+          "preset_sleep_temp": "Sleep (°C)",
+          "preset_away_temp": "Away (°C)",
+          "preset_boost_temp": "Boost (°C)",
+          "boost_duration": "Boost duration (minutes)"
+        }
+      },
+      "advanced_opt": {
+        "title": "Presence, window, weather & energy",
+        "data": {
+          "presence_sensors": "Presence sensors",
+          "window_detection": "Window detection",
+          "window_temp_drop": "Drop threshold (°C)",
+          "window_temp_drop_time": "Time window (min)",
+          "window_open_duration": "Pause duration (min)",
+          "weather_compensation": "Weather compensation",
+          "weather_slope": "Slope",
+          "weather_outside_ref": "Reference outside temp (°C)",
+          "heater_watt": "Heater power (W)",
+          "cooler_watt": "Cooler power (W)"
+        }
+      }
+    }
+  },
+  "selector": {
+    "algorithm": {
+      "options": {
+        "hysteresis": "Hysteresis (on/off)",
+        "pid": "PID controller",
+        "predictive": "Predictive (learns heating/cooling rate)"
+      }
+    }
+  }
+}

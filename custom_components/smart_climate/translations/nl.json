@@ -1,0 +1,138 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Smart Climate — apparaat",
+        "description": "Kies de temperatuursensor en de verwarmings-/koelentiteiten.",
+        "data": {
+          "target_sensor": "Temperatuursensor (binnen)",
+          "heater": "Verwarmingsentiteit (schakelaar of klimaat)",
+          "cooler": "Koelentiteit (schakelaar of klimaat)",
+          "outside_sensor": "Buitentemperatuursensor (optioneel)",
+          "ac_mode": "Airco-modus (verwarmingsentiteit ook voor koeling)"
+        }
+      },
+      "algorithm": {
+        "title": "Algoritme en basisparameters",
+        "data": {
+          "algorithm": "Regelalgoritme",
+          "target_temp": "Begintemperatuur (°C)",
+          "min_temp": "Minimumtemperatuur (°C)",
+          "max_temp": "Maximumtemperatuur (°C)",
+          "cold_tolerance": "Koude tolerantie (°C)",
+          "hot_tolerance": "Warme tolerantie (°C)",
+          "min_cycle_duration": "Minimale schakelcyclus (seconden)",
+          "keep_alive": "Keep-alive interval (seconden)"
+        }
+      },
+      "pid": {
+        "title": "PID-parameters",
+        "description": "Begin met de standaardwaarden en stem af op basis van het gedrag van uw ruimte.",
+        "data": {
+          "pid_kp": "Proportionele versterking (Kp)",
+          "pid_ki": "Integraalversterking (Ki)",
+          "pid_kd": "Differentiaalversterking (Kd)"
+        }
+      },
+      "presets": {
+        "title": "Preset temperaturen",
+        "description": "Stel de doeltemperatuur in voor elk preset.",
+        "data": {
+          "preset_comfort_temp": "Comfort (°C)",
+          "preset_eco_temp": "Eco (°C)",
+          "preset_sleep_temp": "Slaap (°C)",
+          "preset_away_temp": "Afwezig (°C)",
+          "preset_boost_temp": "Boost (°C)",
+          "boost_duration": "Boostduur (minuten)"
+        }
+      },
+      "pump": {
+        "title": "Vloerverwarming pomp",
+        "description": "Configureer de circulatiepomp. Kincony KC868-A6: koppel het pomprelais via ESPHome als switch entiteit.",
+        "data": {
+          "pump_entity": "Pomp relais entiteit (switch)",
+          "pump_zone_entities": "Zone-entiteiten om te bewaken",
+          "pump_anti_seize_interval_h": "Anti-vastloop interval (uren)",
+          "pump_anti_seize_duration_min": "Anti-vastloop duur (minuten)",
+          "pump_post_heat_delay_min": "Na-looptijd (minuten)",
+          "pump_min_run_time_sec": "Minimale looptijd (seconden)",
+          "pump_exercise_time": "Voorkeurstijd (HH:MM)",
+          "learning_enabled": "Zelflerend algoritme",
+          "early_start": "Vroeg starten (Tado-stijl)"
+        }
+      },
+      "advanced": {
+        "title": "Geavanceerde opties",
+        "data": {
+          "presence_sensors": "Aanwezigheidssensoren (personen / device trackers)",
+          "window_detection": "Raamdeetctie inschakelen",
+          "window_temp_drop": "Temperatuurdaling voor raamalarm (°C)",
+          "window_temp_drop_time": "Tijdsvenster voor raamdaling (minuten)",
+          "window_open_duration": "Pauzetijd na raampdetectie (minuten)",
+          "weather_compensation": "Weerscompensatie inschakelen",
+          "weather_slope": "Weerscompensatie helling (°C/°C)",
+          "weather_outside_ref": "Referentie buitentemperatuur (°C)",
+          "heater_watt": "Vermogen verwarming (Watt)",
+          "cooler_watt": "Vermogen koeling (Watt)"
+        }
+      }
+    },
+    "error": {
+      "no_actuator": "Geef minimaal een verwarmings- of koelentiteit op.",
+      "unknown": "Onverwachte fout."
+    },
+    "abort": {
+      "already_configured": "Dit apparaat is al geconfigureerd."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Algoritme en PID",
+        "data": {
+          "algorithm": "Regelalgoritme",
+          "cold_tolerance": "Koude tolerantie (°C)",
+          "hot_tolerance": "Warme tolerantie (°C)",
+          "pid_kp": "Kp",
+          "pid_ki": "Ki",
+          "pid_kd": "Kd"
+        }
+      },
+      "presets_opt": {
+        "title": "Preset temperaturen",
+        "data": {
+          "preset_comfort_temp": "Comfort (°C)",
+          "preset_eco_temp": "Eco (°C)",
+          "preset_sleep_temp": "Slaap (°C)",
+          "preset_away_temp": "Afwezig (°C)",
+          "preset_boost_temp": "Boost (°C)",
+          "boost_duration": "Boostduur (minuten)"
+        }
+      },
+      "advanced_opt": {
+        "title": "Aanwezigheid, raam, weer en energie",
+        "data": {
+          "presence_sensors": "Aanwezigheidssensoren",
+          "window_detection": "Raamdectie",
+          "window_temp_drop": "Drempel temperatuurdaling (°C)",
+          "window_temp_drop_time": "Tijdsvenster (min)",
+          "window_open_duration": "Pauzetijd (min)",
+          "weather_compensation": "Weerscompensatie",
+          "weather_slope": "Helling",
+          "weather_outside_ref": "Referentie buitentemperatuur (°C)",
+          "heater_watt": "Verwarmingsvermogen (W)",
+          "cooler_watt": "Koelingsvermogen (W)"
+        }
+      }
+    }
+  },
+  "selector": {
+    "algorithm": {
+      "options": {
+        "hysteresis": "Hysterese (aan/uit)",
+        "pid": "PID-regelaar",
+        "predictive": "Voorspellend (leert verwarmings-/koelsnelheid)"
+      }
+    }
+  }
+}
