@@ -46,6 +46,18 @@
           "boost_duration": "Boostduur (minuten)"
         }
       },
+      "cascade": {
+        "title": "Cascade regeling (primaire + secundaire bron)",
+        "description": "Stel in welke entiteit als primaire bron (bijv. airco) fungeert. De secundaire bron (bijv. vloerverwarming) springt pas bij als de primaire bron het niet redt.",
+        "data": {
+          "cascade_enabled": "Cascade inschakelen",
+          "cascade_primary_heater": "Primaire verwarmingsentiteit (bijv. airco)",
+          "cascade_primary_cooler": "Primaire koelentiteit (bijv. airco)",
+          "cascade_timeout_min": "Wachttijd voor secundaire bron (minuten)",
+          "cascade_temp_threshold": "Temperatuurtekort om secundaire te activeren (°C)",
+          "cascade_deactivate_delay_min": "Uitschakelvertraging secundaire bron (minuten)"
+        }
+      },
       "pump": {
         "title": "Vloerverwarming pomp",
         "description": "Configureer de circulatiepomp. Laat 'pompentiteit' leeg als u geen pomp heeft. Kincony KC868-A6: koppel het relais als switch entiteit via ESPHome.",

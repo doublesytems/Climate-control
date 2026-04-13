@@ -20,6 +20,12 @@ from .const import (
     CONF_COLD_TOLERANCE,
     CONF_COOLER,
     CONF_COOLER_WATT,
+    CONF_CASCADE_DEACTIVATE_DELAY,
+    CONF_CASCADE_ENABLED,
+    CONF_CASCADE_PRIMARY_COOLER,
+    CONF_CASCADE_PRIMARY_HEATER,
+    CONF_CASCADE_TEMP_THRESHOLD,
+    CONF_CASCADE_TIMEOUT,
     CONF_EARLY_START,
     CONF_HEATER,
     CONF_HEATER_WATT,
@@ -68,6 +74,9 @@ from .const import (
     DEFAULT_PRESET_SLEEP,
     DEFAULT_PUMP_ANTI_SEIZE_DURATION,
     DEFAULT_PUMP_ANTI_SEIZE_INTERVAL,
+    DEFAULT_CASCADE_DEACTIVATE_DELAY,
+    DEFAULT_CASCADE_TEMP_THRESHOLD,
+    DEFAULT_CASCADE_TIMEOUT,
     DEFAULT_PUMP_EXERCISE_TIME,
     DEFAULT_PUMP_MIN_RUN_TIME,
     DEFAULT_PUMP_POST_HEAT_DELAY,
@@ -264,8 +273,42 @@ class SmartClimateConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> config_entries.FlowResult:
         if user_input is not None:
             self._data.update(user_input)
-            return await self.async_step_pump()
+            return await self.async_step_cascade()
         return self.async_show_form(step_id="advanced", data_schema=STEP_ADVANCED_SCHEMA)
+
+    async def async_step_cascade(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Optionele cascade-configuratie (primaire + secundaire verwarming/koeling)."""
+        if user_input is not None:
+            self._data.update(user_input)
+            return await self.async_step_pump()
+
+        cascade_schema = vol.Schema(
+            {
+                vol.Optional(CONF_CASCADE_ENABLED, default=False): selector.BooleanSelector(),
+                vol.Optional(CONF_CASCADE_PRIMARY_HEATER): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain=["climate", "switch", "input_boolean"]
+                    )
+                ),
+                vol.Optional(CONF_CASCADE_PRIMARY_COOLER): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain=["climate", "switch", "input_boolean"]
+                    )
+                ),
+                vol.Optional(CONF_CASCADE_TIMEOUT, default=DEFAULT_CASCADE_TIMEOUT): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=5, max=120, step=5, mode="box")
+                ),
+                vol.Optional(CONF_CASCADE_TEMP_THRESHOLD, default=DEFAULT_CASCADE_TEMP_THRESHOLD): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.5, max=5.0, step=0.5, mode="box")
+                ),
+                vol.Optional(CONF_CASCADE_DEACTIVATE_DELAY, default=DEFAULT_CASCADE_DEACTIVATE_DELAY): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0, max=60, step=5, mode="box")
+                ),
+            }
+        )
+        return self.async_show_form(step_id="cascade", data_schema=cascade_schema)
 
     async def async_step_pump(
         self, user_input: dict[str, Any] | None = None

@@ -60,6 +60,10 @@ from .const import (
     ATTR_BOOST_END,
     ATTR_BOOST_REMAINING,
     ATTR_COOLER_ON,
+    ATTR_CASCADE_PRIMARY_ON,
+    ATTR_CASCADE_REASON,
+    ATTR_CASCADE_SECONDARY_ON,
+    ATTR_CASCADE_SECONDARY_SINCE,
     ATTR_COOLER_RUNTIME_TODAY,
     ATTR_COOLING_RATE,
     ATTR_HEATER_ON,
@@ -107,6 +111,12 @@ from .const import (
     CONF_WEATHER_COMPENSATION,
     CONF_WEATHER_OUTSIDE_REF,
     CONF_WEATHER_SLOPE,
+    CONF_CASCADE_DEACTIVATE_DELAY,
+    CONF_CASCADE_ENABLED,
+    CONF_CASCADE_PRIMARY_COOLER,
+    CONF_CASCADE_PRIMARY_HEATER,
+    CONF_CASCADE_TEMP_THRESHOLD,
+    CONF_CASCADE_TIMEOUT,
     CONF_EARLY_START,
     CONF_LEARNING_ENABLED,
     CONF_WINDOW_DETECTION,
@@ -130,6 +140,9 @@ from .const import (
     DEFAULT_WEATHER_SLOPE,
     DEFAULT_WINDOW_OPEN_DURATION,
     DEFAULT_WINDOW_TEMP_DROP,
+    DEFAULT_CASCADE_DEACTIVATE_DELAY,
+    DEFAULT_CASCADE_TEMP_THRESHOLD,
+    DEFAULT_CASCADE_TIMEOUT,
     DEFAULT_WINDOW_TEMP_DROP_TIME,
     DOMAIN,
     EMA_ALPHA,
@@ -201,6 +214,12 @@ async def async_setup_entry(
         schedule_data=list(d.get(CONF_SCHEDULE) or []),
         learning_enabled=bool(d.get(CONF_LEARNING_ENABLED, True)),
         early_start=bool(d.get(CONF_EARLY_START, True)),
+        cascade_enabled=bool(d.get(CONF_CASCADE_ENABLED, False)),
+        cascade_primary_heater=d.get(CONF_CASCADE_PRIMARY_HEATER),
+        cascade_primary_cooler=d.get(CONF_CASCADE_PRIMARY_COOLER),
+        cascade_timeout_min=int(d.get(CONF_CASCADE_TIMEOUT, DEFAULT_CASCADE_TIMEOUT)),
+        cascade_temp_threshold=float(d.get(CONF_CASCADE_TEMP_THRESHOLD, DEFAULT_CASCADE_TEMP_THRESHOLD)),
+        cascade_deactivate_delay_min=int(d.get(CONF_CASCADE_DEACTIVATE_DELAY, DEFAULT_CASCADE_DEACTIVATE_DELAY)),
     )
 
     # Load persistent storage (learned rates etc.)
@@ -369,6 +388,12 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         schedule_data: list[dict],
         learning_enabled: bool,
         early_start: bool,
+        cascade_enabled: bool,
+        cascade_primary_heater: str | None,
+        cascade_primary_cooler: str | None,
+        cascade_timeout_min: int,
+        cascade_temp_threshold: float,
+        cascade_deactivate_delay_min: int,
     ) -> None:
         self.hass = hass
         self._config_entry = config_entry
@@ -477,6 +502,21 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         self._attr_preset_modes = [PRESET_NONE] + [
             PRESET_COMFORT, PRESET_ECO, PRESET_SLEEP, PRESET_AWAY, PRESET_BOOST, PRESET_SCHEDULE
         ]
+
+        # Cascade (primaire + secundaire verwarming/koeling)
+        self._cascade_enabled = cascade_enabled
+        self._cascade_primary_heater = cascade_primary_heater
+        self._cascade_primary_cooler = cascade_primary_cooler
+        self._cascade_timeout_min = cascade_timeout_min
+        self._cascade_temp_threshold = cascade_temp_threshold
+        self._cascade_deactivate_delay_min = cascade_deactivate_delay_min
+
+        self._cascade_primary_heat_on: bool = False
+        self._cascade_primary_cool_on: bool = False
+        self._cascade_primary_start_time: datetime | None = None
+        self._cascade_secondary_active: bool = False
+        self._cascade_secondary_start_time: datetime | None = None
+        self._cascade_reason: str = ""
 
         # Self-learning
         self._learning_enabled = learning_enabled
@@ -695,6 +735,13 @@ class SmartClimate(ClimateEntity, RestoreEntity):
             attrs["learned_heating_rate_c_per_min"] = round(self._learned_heating_rate, 4)
         if self._learned_cooling_rate is not None:
             attrs["learned_cooling_rate_c_per_min"] = round(self._learned_cooling_rate, 4)
+        if self._cascade_enabled:
+            attrs[ATTR_CASCADE_PRIMARY_ON] = self._cascade_primary_heat_on or self._cascade_primary_cool_on
+            attrs[ATTR_CASCADE_SECONDARY_ON] = self._cascade_secondary_active
+            attrs[ATTR_CASCADE_REASON] = self._cascade_reason
+            if self._cascade_secondary_active and self._cascade_secondary_start_time:
+                elapsed = (now - self._cascade_secondary_start_time).total_seconds() / 60
+                attrs[ATTR_CASCADE_SECONDARY_SINCE] = round(elapsed, 1)
         if self._window_open and self._window_open_since:
             attrs[ATTR_WINDOW_OPEN_SINCE] = self._window_open_since.isoformat()
         if self._boost_end:
@@ -1150,12 +1197,183 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         current = self._attr_current_temperature
         target = self.effective_target_temperature
 
-        if self._algorithm == ALGORITHM_HYSTERESIS:
+        if self._cascade_enabled and (
+            self._cascade_primary_heater or self._cascade_primary_cooler
+        ):
+            await self._control_cascade(current, target)
+        elif self._algorithm == ALGORITHM_HYSTERESIS:
             await self._control_hysteresis(current, target)
         elif self._algorithm == ALGORITHM_PID:
             await self._control_pid(current, target)
         elif self._algorithm == ALGORITHM_PREDICTIVE:
             await self._control_predictive(current, target)
+
+    # ------------------------------------------------------------------
+    # Cascade besturing
+    # ------------------------------------------------------------------
+
+    async def _control_cascade(self, current: float, target: float) -> None:
+        """Cascade: primaire bron (airco) eerst, secundaire (vloerverwarming) als back-up.
+
+        Verwarmingsstrategie:
+          1. Te koud  → zet primaire verwarming aan
+          2. Primaire al X min aan maar temp nog Y°C te laag → secundaire erbij
+          3. Doel bereikt → secundaire eerst uit (na vertraging), dan primaire
+
+        Koelstrategie: zelfde logica omgekeerd.
+        """
+        wants_heat = self._hvac_mode in (HVACMode.HEAT, HVACMode.HEAT_COOL)
+        wants_cool = self._hvac_mode in (HVACMode.COOL, HVACMode.HEAT_COOL) or (
+            self._hvac_mode == HVACMode.HEAT and self._ac_mode
+        )
+
+        too_cold = current < (target - self._cold_tolerance)
+        too_hot  = current > (target + self._hot_tolerance)
+        at_target = not too_cold and not too_hot
+
+        now = dt_util.utcnow()
+
+        # ---- Verwarming ----
+        if wants_heat and self._cascade_primary_heater:
+            if too_cold:
+                # Stap 1: primaire aan
+                if not self._cascade_primary_heat_on:
+                    await self._async_switch_primary(self._cascade_primary_heater, True, "heat")
+                    self._cascade_primary_heat_on = True
+                    self._cascade_primary_start_time = now
+                    self._cascade_reason = "primaire verwarming actief"
+                    _LOGGER.info("[%s] Cascade HEAT: primaire (airco) aan", self.name)
+
+                # Stap 2: secundaire nodig?
+                if self._cascade_primary_heat_on and self._cascade_primary_start_time:
+                    elapsed = (now - self._cascade_primary_start_time).total_seconds() / 60
+                    shortfall = target - current
+                    if (elapsed >= self._cascade_timeout_min
+                            and shortfall > self._cascade_temp_threshold
+                            and not self._cascade_secondary_active):
+                        await self._async_turn_on_heater()
+                        self._cascade_secondary_active = True
+                        self._cascade_secondary_start_time = now
+                        self._cascade_reason = (
+                            f"secundaire aan na {elapsed:.0f} min, "
+                            f"nog {shortfall:.1f}°C tekort"
+                        )
+                        _LOGGER.info(
+                            "[%s] Cascade HEAT: primaire onvoldoende na %.0f min "
+                            "(tekort %.1f°C) → secundaire (vloer) aan",
+                            self.name, elapsed, shortfall,
+                        )
+
+            elif at_target or current >= target:
+                # Stap 3: doel bereikt
+                if self._cascade_secondary_active:
+                    # Secundaire uit, na korte vertraging
+                    if self._cascade_secondary_start_time:
+                        sec_elapsed = (now - self._cascade_secondary_start_time).total_seconds() / 60
+                        if sec_elapsed >= self._cascade_deactivate_delay_min:
+                            await self._async_turn_off_heater()
+                            self._cascade_secondary_active = False
+                            self._cascade_secondary_start_time = None
+                            self._cascade_reason = "doel bereikt, secundaire uit"
+                            _LOGGER.info("[%s] Cascade HEAT: doel bereikt, secundaire uit", self.name)
+                    else:
+                        await self._async_turn_off_heater()
+                        self._cascade_secondary_active = False
+
+                # Primaire uit
+                if not self._cascade_secondary_active and self._cascade_primary_heat_on:
+                    await self._async_switch_primary(self._cascade_primary_heater, False, "heat")
+                    self._cascade_primary_heat_on = False
+                    self._cascade_primary_start_time = None
+                    self._cascade_reason = "doel bereikt, primaire uit"
+                    _LOGGER.info("[%s] Cascade HEAT: doel bereikt, primaire (airco) uit", self.name)
+
+        # ---- Koeling ----
+        if wants_cool and self._cascade_primary_cooler:
+            if too_hot:
+                if not self._cascade_primary_cool_on:
+                    await self._async_switch_primary(self._cascade_primary_cooler, True, "cool")
+                    self._cascade_primary_cool_on = True
+                    self._cascade_primary_start_time = now
+                    self._cascade_reason = "primaire koeling actief"
+                    _LOGGER.info("[%s] Cascade COOL: primaire (airco) aan", self.name)
+
+                if self._cascade_primary_cool_on and self._cascade_primary_start_time:
+                    elapsed = (now - self._cascade_primary_start_time).total_seconds() / 60
+                    shortfall = current - target
+                    if (elapsed >= self._cascade_timeout_min
+                            and shortfall > self._cascade_temp_threshold
+                            and not self._cascade_secondary_active):
+                        await self._async_turn_on_cooler()
+                        self._cascade_secondary_active = True
+                        self._cascade_secondary_start_time = now
+                        self._cascade_reason = (
+                            f"secundaire koeling aan na {elapsed:.0f} min, "
+                            f"nog {shortfall:.1f}°C te warm"
+                        )
+                        _LOGGER.info(
+                            "[%s] Cascade COOL: primaire onvoldoende na %.0f min → secundaire aan",
+                            self.name, elapsed,
+                        )
+
+            elif at_target or current <= target:
+                if self._cascade_secondary_active:
+                    if self._cascade_secondary_start_time:
+                        sec_elapsed = (now - self._cascade_secondary_start_time).total_seconds() / 60
+                        if sec_elapsed >= self._cascade_deactivate_delay_min:
+                            await self._async_turn_off_cooler()
+                            self._cascade_secondary_active = False
+                            self._cascade_secondary_start_time = None
+                    else:
+                        await self._async_turn_off_cooler()
+                        self._cascade_secondary_active = False
+
+                if not self._cascade_secondary_active and self._cascade_primary_cool_on:
+                    await self._async_switch_primary(self._cascade_primary_cooler, False, "cool")
+                    self._cascade_primary_cool_on = False
+                    self._cascade_primary_start_time = None
+                    self._cascade_reason = "doel bereikt, primaire koeling uit"
+
+    async def _async_switch_primary(
+        self, entity_id: str, turn_on: bool, mode: str
+    ) -> None:
+        """Schakel de primaire entiteit (airco) in/uit.
+
+        Ondersteunt climate-entiteiten (hvac_mode) en switch-entiteiten.
+        """
+        domain = entity_id.split(".")[0]
+        if domain == "climate":
+            if turn_on:
+                hvac = HVACMode.HEAT if mode == "heat" else HVACMode.COOL
+                await self.hass.services.async_call(
+                    "climate",
+                    "set_hvac_mode",
+                    {"entity_id": entity_id, "hvac_mode": hvac},
+                    blocking=True,
+                )
+                # Stel ook de doeltemperatuur in op de airco
+                if self._attr_target_temperature:
+                    await self.hass.services.async_call(
+                        "climate",
+                        "set_temperature",
+                        {
+                            "entity_id": entity_id,
+                            "temperature": self.effective_target_temperature,
+                        },
+                        blocking=True,
+                    )
+            else:
+                await self.hass.services.async_call(
+                    "climate",
+                    "set_hvac_mode",
+                    {"entity_id": entity_id, "hvac_mode": HVACMode.OFF},
+                    blocking=True,
+                )
+        elif domain in ("switch", "input_boolean"):
+            service = "turn_on" if turn_on else "turn_off"
+            await self.hass.services.async_call(
+                domain, service, {"entity_id": entity_id}, blocking=True
+            )
 
     # ------------------------------------------------------------------
     # Algorithm 1: Hysteresis

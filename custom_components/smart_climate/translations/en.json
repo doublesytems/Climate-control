@@ -46,6 +46,18 @@
           "boost_duration": "Boost duration (minutes)"
         }
       },
+      "cascade": {
+        "title": "Cascade control (primary + secondary source)",
+        "description": "The primary source (e.g. AC) tries first. The secondary source (e.g. floor heating) only activates if the primary cannot reach the target within the configured time.",
+        "data": {
+          "cascade_enabled": "Enable cascade",
+          "cascade_primary_heater": "Primary heating entity (e.g. AC)",
+          "cascade_primary_cooler": "Primary cooling entity (e.g. AC)",
+          "cascade_timeout_min": "Wait time before secondary activates (minutes)",
+          "cascade_temp_threshold": "Temperature shortfall to trigger secondary (°C)",
+          "cascade_deactivate_delay_min": "Secondary deactivation delay (minutes)"
+        }
+      },
       "pump": {
         "title": "Floor heating pump",
         "description": "Configure the circulation pump. Leave 'pump entity' empty if you don't have one. Kincony KC868-A6: add the relay as a switch entity via ESPHome.",

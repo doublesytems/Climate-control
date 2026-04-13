@@ -63,6 +63,14 @@ CONF_SCHEDULE = "schedule"
 CONF_LEARNING_ENABLED = "learning_enabled"
 CONF_EARLY_START = "early_start"
 
+# Cascade (primaire + secundaire verwarming/koeling)
+CONF_CASCADE_ENABLED = "cascade_enabled"
+CONF_CASCADE_PRIMARY_HEATER = "cascade_primary_heater"
+CONF_CASCADE_PRIMARY_COOLER = "cascade_primary_cooler"
+CONF_CASCADE_TIMEOUT = "cascade_timeout_min"
+CONF_CASCADE_TEMP_THRESHOLD = "cascade_temp_threshold"
+CONF_CASCADE_DEACTIVATE_DELAY = "cascade_deactivate_delay_min"
+
 # Pump
 CONF_PUMP_ENTITY = "pump_entity"
 CONF_PUMP_ZONE_ENTITIES = "pump_zone_entities"
@@ -130,6 +138,11 @@ EMA_ALPHA = 0.3          # weight of newest observation in EMA update
 DEFAULT_LEARNING_ENABLED = True
 DEFAULT_EARLY_START = True
 
+# Cascade
+DEFAULT_CASCADE_TIMEOUT = 30          # minuten wachten voor secundair inschakelt
+DEFAULT_CASCADE_TEMP_THRESHOLD = 1.5  # °C tekort t.o.v. doel om secundair te activeren
+DEFAULT_CASCADE_DEACTIVATE_DELAY = 10 # minuten secundair nog aan na bereiken doel
+
 # Pump
 DEFAULT_PUMP_ANTI_SEIZE_INTERVAL = 24   # hours
 DEFAULT_PUMP_ANTI_SEIZE_DURATION = 30   # minutes
@@ -174,6 +187,10 @@ ATTR_WEATHER_ADJ = "weather_temp_adjustment"
 ATTR_ACTIVE_SCHEDULE = "active_schedule_entry"
 ATTR_HEATER_RUNTIME_TODAY = "heater_runtime_today_h"
 ATTR_COOLER_RUNTIME_TODAY = "cooler_runtime_today_h"
+ATTR_CASCADE_PRIMARY_ON = "cascade_primary_on"
+ATTR_CASCADE_SECONDARY_ON = "cascade_secondary_on"
+ATTR_CASCADE_SECONDARY_SINCE = "cascade_secondary_since_min"
+ATTR_CASCADE_REASON = "cascade_reason"
 
 # ---------------------------------------------------------------------------
 # Services

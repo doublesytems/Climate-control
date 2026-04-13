@@ -18,6 +18,23 @@ Een geavanceerde HACS custom integration voor Home Assistant met slimme klimaatb
 - Geleerde snelheden en PID-status worden **persistent opgeslagen** en overleven een herstart van Home Assistant
 - **Vroeg starten**: het systeem berekent automatisch wanneer de verwarming moet starten zodat de ruimte precies op temperatuur is bij een schema-wijziging — net zoals Tado
 
+### Cascade regeling (primaire + secundaire bron)
+De primaire bron (bijv. airco) gaat altijd als eerste aan. De secundaire bron (bijv. vloerverwarming) springt pas bij als de primaire bron het doel niet haalt binnen de ingestelde tijd.
+
+**Voorbeeld tijdlijn** — doeltemperatuur 20 °C, huidig 17 °C:
+```
+00:00  Te koud → Airco (primaire) gaat aan
+00:30  Na 30 min: temp 18,2°C — nog 1,8°C tekort → Vloerverwarming (secundaire) aan
+00:55  Temperatuur bereikt 20°C
+01:05  Vloerverwarming (na vertraging) uit → Airco uit
+```
+
+| Instelling | Standaard | Beschrijving |
+|-----------|-----------|-------------|
+| Wachttijd secundaire | 30 min | Hoe lang de primaire bron de kans krijgt |
+| Temperatuurtekort | 1,5 °C | Hoeveel onder doel om secundaire te activeren |
+| Uitschakelvertraging | 10 min | Secundaire nog even aan na bereiken doel |
+
 ### Presets
 | Preset | Standaard | Beschrijving |
 |--------|-----------|-------------|
@@ -29,7 +46,7 @@ Een geavanceerde HACS custom integration voor Home Assistant met slimme klimaatb
 | Schema | — | Volgt het weekschema |
 
 ### Weekschema
-Stel tijdblokken in per dag via de service `smart_climate.set_schedule`. Voorbeeld:
+Stel tijdblokken in per dag via de service `smart_climate.set_schedule`:
 
 ```yaml
 service: smart_climate.set_schedule
@@ -139,14 +156,15 @@ data:
 
 ## Configuratiewizard
 
-De integratie wordt ingesteld via een 6-staps wizard in de Home Assistant UI:
+De integratie wordt ingesteld via een 7-staps wizard in de Home Assistant UI:
 
 1. **Apparaat** — sensor, verwarming, koeling, buitensensor
 2. **Algoritme** — keuze + basisparameters (tolerantie, min/max temp)
 3. **PID-parameters** — Kp, Ki, Kd (alleen bij PID-algoritme)
 4. **Presets** — temperatuur per preset + boostduur
 5. **Geavanceerd** — aanwezigheid, raamdetectie, weerscompensatie, vermogen
-6. **Pomp** — pompentiteit, zones, anti-vastloop, na-looptijd, vroeg starten
+6. **Cascade** — primaire bron (airco), secundaire bron (vloer), wachttijd, drempel
+7. **Pomp** — pompentiteit, zones, anti-vastloop, na-looptijd, vroeg starten
 
 Alle instellingen zijn achteraf te wijzigen via **Integraties → Smart Climate → Configureren**.
 
@@ -168,6 +186,10 @@ De thermostaat-entiteit toont onder andere:
 | `predicted_reach_time_min` | Geschatte tijd tot doeltemperatuur (min) |
 | `boost_remaining_min` | Resterende boosttijd |
 | `heater_runtime_today_h` | Verwarmingstijd vandaag (uren) |
+| `cascade_primary_on` | Primaire bron (airco) actief |
+| `cascade_secondary_on` | Secundaire bron (vloer) actief |
+| `cascade_reason` | Reden van huidige cascade-status |
+| `cascade_secondary_since_min` | Minuten dat secundaire bron actief is |
 
 ---
 
