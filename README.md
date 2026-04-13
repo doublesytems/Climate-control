@@ -137,25 +137,6 @@ data:
 
 ---
 
-## Kincony KC868-A6-V1 (10 zones)
-
-De KC868-A6 heeft 6 relaisuitgangen. Voor 10 zones zijn 2 boards nodig:
-
-```
-Board 1 — relais 1-6  →  zone 1 t/m 6   (switch.zone_1 … switch.zone_6)
-Board 2 — relais 1-4  →  zone 7 t/m 10  (switch.zone_7 … switch.zone_10)
-Board 2 — relais 5    →  circulatiepomp  (switch.floor_pump)
-Board 2 — relais 6    →  reserve
-```
-
-**Integratie via ESPHome (aanbevolen):**
-1. Flash ESPHome firmware op het KC868-A6 board
-2. Elke relay wordt automatisch een `switch`-entiteit in Home Assistant
-3. Wijs elk relais toe als `heater`-entiteit bij het instellen van een Smart Climate zone
-4. Wijs het pomprelais toe als `pump_entity` in de pompstap van de configuratiewizard
-
----
-
 ## Configuratiewizard
 
 De integratie wordt ingesteld via een 6-staps wizard in de Home Assistant UI:
