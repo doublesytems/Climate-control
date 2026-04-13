@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "custom_components/smart_climate/manifest.json"
+
+jobs:
+  release:
+    name: Maak release aan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lees versie uit manifest.json
+        id: version
+        run: |
+          VERSION=$(python3 -c "import json; print(json.load(open('custom_components/smart_climate/manifest.json'))['version'])")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Controleer of release al bestaat
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${{ steps.version.outputs.tag }}" > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Maak GitHub Release aan
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "Smart Climate ${{ steps.version.outputs.tag }}" \
+            --generate-notes
