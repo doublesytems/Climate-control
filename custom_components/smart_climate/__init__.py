@@ -73,6 +73,19 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unload_ok
 
 
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate old config entry to current VERSION."""
+    _LOGGER.debug("Migrating Smart Climate entry from version %s", entry.version)
+
+    if entry.version == 1:
+        # v1 → v2: cascade-velden toegevoegd; geen datamutatie nodig,
+        # de wizard-stap levert standaardwaarden.
+        hass.config_entries.async_update_entry(entry, version=2)
+        _LOGGER.info("Smart Climate config entry gemigreerd naar versie 2")
+
+    return True
+
+
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload when options change."""
     await hass.config_entries.async_reload(entry.entry_id)
