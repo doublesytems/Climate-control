@@ -793,6 +793,11 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         self._attr_target_temperature = temp
         self._attr_preset_mode = PRESET_NONE
         self._pid.reset()
+        # Stuur nieuwe doeltemperatuur direct door naar actieve climate-entiteiten
+        if self._heater_on and self._heater_entity_id:
+            await self._async_update_primary_temperature(self._heater_entity_id)
+        if self._cooler_on and self._cooler_entity_id:
+            await self._async_update_primary_temperature(self._cooler_entity_id)
         await self._async_control_heating()
         self.async_write_ha_state()
 
@@ -1591,9 +1596,22 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                 domain, service, {"entity_id": entity_id}, blocking=True
             )
         elif domain == "climate":
+            hvac_mode = HVACMode.HEAT if turn_on else HVACMode.OFF
+            if self._ac_mode and turn_on:
+                hvac_mode = HVACMode.COOL
             await self.hass.services.async_call(
                 "climate",
                 "set_hvac_mode",
-                {"entity_id": entity_id, "hvac_mode": HVACMode.HEAT if turn_on else HVACMode.OFF},
+                {"entity_id": entity_id, "hvac_mode": hvac_mode},
                 blocking=True,
             )
+            if turn_on and self._attr_target_temperature:
+                await self.hass.services.async_call(
+                    "climate",
+                    "set_temperature",
+                    {
+                        "entity_id": entity_id,
+                        "temperature": self.effective_target_temperature,
+                    },
+                    blocking=True,
+                )
