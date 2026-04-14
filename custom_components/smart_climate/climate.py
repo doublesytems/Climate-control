@@ -703,9 +703,9 @@ class SmartClimate(ClimateEntity, RestoreEntity):
     def hvac_action(self) -> HVACAction:
         if self._hvac_mode == HVACMode.OFF:
             return HVACAction.OFF
-        if self._heater_on:
+        if self._heater_on or self._cascade_primary_heat_on:
             return HVACAction.HEATING
-        if self._cooler_on:
+        if self._cooler_on or self._cascade_primary_cool_on:
             return HVACAction.COOLING
         return HVACAction.IDLE
 
