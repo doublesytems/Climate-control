@@ -1,12 +1,12 @@
 {
   "domain": "smart_climate",
   "name": "Smart Climate",
-  "version": "1.1.0",
-  "documentation": "https://github.com/doublesytems/Climate-control",
-  "issue_tracker": "https://github.com/doublesytems/Climate-control/issues",
-  "dependencies": [],
   "codeowners": ["@doublesytems"],
-  "requirements": [],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/doublesytems/Climate-control",
   "iot_class": "local_push",
-  "config_flow": true
+  "issue_tracker": "https://github.com/doublesytems/Climate-control/issues",
+  "requirements": [],
+  "version": "1.1.0"
 }
