@@ -235,11 +235,8 @@ class SmartClimateConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> config_entries.FlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            if not user_input.get(CONF_HEATER) and not user_input.get(CONF_COOLER):
-                errors["base"] = "no_actuator"
-            else:
-                self._data.update(user_input)
-                return await self.async_step_algorithm()
+            self._data.update(user_input)
+            return await self.async_step_algorithm()
         return self.async_show_form(step_id="user", data_schema=STEP_USER_SCHEMA, errors=errors)
 
     async def async_step_algorithm(
@@ -280,9 +277,15 @@ class SmartClimateConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
         """Optionele cascade-configuratie (primaire + secundaire verwarming/koeling)."""
+        errors: dict[str, str] = {}
         if user_input is not None:
-            self._data.update(user_input)
-            return await self.async_step_pump()
+            cascade_on = user_input.get(CONF_CASCADE_ENABLED, False)
+            has_primary = user_input.get(CONF_CASCADE_PRIMARY_HEATER) or user_input.get(CONF_CASCADE_PRIMARY_COOLER)
+            has_secondary = self._data.get(CONF_HEATER) or self._data.get(CONF_COOLER)
+            if not cascade_on or has_primary or has_secondary:
+                self._data.update(user_input)
+                return await self.async_step_pump()
+            errors["base"] = "cascade_needs_primary_or_secondary"
 
         cascade_schema = vol.Schema(
             {
@@ -308,7 +311,7 @@ class SmartClimateConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ),
             }
         )
-        return self.async_show_form(step_id="cascade", data_schema=cascade_schema)
+        return self.async_show_form(step_id="cascade", data_schema=cascade_schema, errors=errors)
 
     async def async_step_pump(
         self, user_input: dict[str, Any] | None = None

@@ -1254,18 +1254,29 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                     if (elapsed >= self._cascade_timeout_min
                             and shortfall > self._cascade_temp_threshold
                             and not self._cascade_secondary_active):
-                        await self._async_turn_on_heater()
-                        self._cascade_secondary_active = True
-                        self._cascade_secondary_start_time = now
-                        self._cascade_reason = (
-                            f"secundaire aan na {elapsed:.0f} min, "
-                            f"nog {shortfall:.1f}°C tekort"
-                        )
-                        _LOGGER.info(
-                            "[%s] Cascade HEAT: primaire onvoldoende na %.0f min "
-                            "(tekort %.1f°C) → secundaire (vloer) aan",
-                            self.name, elapsed, shortfall,
-                        )
+                        if self._heater_entity_id:
+                            await self._async_turn_on_heater()
+                            self._cascade_secondary_active = True
+                            self._cascade_secondary_start_time = now
+                            self._cascade_reason = (
+                                f"secundaire aan na {elapsed:.0f} min, "
+                                f"nog {shortfall:.1f}°C tekort"
+                            )
+                            _LOGGER.info(
+                                "[%s] Cascade HEAT: primaire onvoldoende na %.0f min "
+                                "(tekort %.1f°C) → secundaire (vloer) aan",
+                                self.name, elapsed, shortfall,
+                            )
+                        else:
+                            self._cascade_reason = (
+                                f"primaire onvoldoende na {elapsed:.0f} min, "
+                                "geen secundaire geconfigureerd"
+                            )
+                            _LOGGER.debug(
+                                "[%s] Cascade HEAT: primaire onvoldoende maar geen "
+                                "secundaire geconfigureerd — primary-only modus",
+                                self.name,
+                            )
 
             elif at_target or current >= target:
                 # Stap 3: doel bereikt
@@ -1310,17 +1321,28 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                     if (elapsed >= self._cascade_timeout_min
                             and shortfall > self._cascade_temp_threshold
                             and not self._cascade_secondary_active):
-                        await self._async_turn_on_cooler()
-                        self._cascade_secondary_active = True
-                        self._cascade_secondary_start_time = now
-                        self._cascade_reason = (
-                            f"secundaire koeling aan na {elapsed:.0f} min, "
-                            f"nog {shortfall:.1f}°C te warm"
-                        )
-                        _LOGGER.info(
-                            "[%s] Cascade COOL: primaire onvoldoende na %.0f min → secundaire aan",
-                            self.name, elapsed,
-                        )
+                        if self._cooler_entity_id:
+                            await self._async_turn_on_cooler()
+                            self._cascade_secondary_active = True
+                            self._cascade_secondary_start_time = now
+                            self._cascade_reason = (
+                                f"secundaire koeling aan na {elapsed:.0f} min, "
+                                f"nog {shortfall:.1f}°C te warm"
+                            )
+                            _LOGGER.info(
+                                "[%s] Cascade COOL: primaire onvoldoende na %.0f min → secundaire aan",
+                                self.name, elapsed,
+                            )
+                        else:
+                            self._cascade_reason = (
+                                f"primaire onvoldoende na {elapsed:.0f} min, "
+                                "geen secundaire geconfigureerd"
+                            )
+                            _LOGGER.debug(
+                                "[%s] Cascade COOL: primaire onvoldoende maar geen "
+                                "secundaire geconfigureerd — primary-only modus",
+                                self.name,
+                            )
 
             elif at_target or current <= target:
                 if self._cascade_secondary_active:

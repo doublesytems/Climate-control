@@ -91,6 +91,7 @@
     },
     "error": {
       "no_actuator": "Provide at least one heater or cooler entity.",
+      "cascade_needs_primary_or_secondary": "Cascade is enabled but no primary entity (e.g. AC) is configured. Add a primary heating or cooling entity, or disable cascade.",
       "unknown": "Unexpected error."
     },
     "abort": {

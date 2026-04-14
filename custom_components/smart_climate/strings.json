@@ -91,6 +91,7 @@
     },
     "error": {
       "no_actuator": "Geef minimaal een verwarmings- of koelentiteit op.",
+      "cascade_needs_primary_or_secondary": "Cascade is ingeschakeld maar er is geen primaire entiteit (airco) opgegeven. Vul een primaire verwarmings- of koelentiteit in, of schakel cascade uit.",
       "unknown": "Onverwachte fout."
     },
     "abort": {
