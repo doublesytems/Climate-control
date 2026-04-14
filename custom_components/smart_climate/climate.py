@@ -1235,9 +1235,7 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         Koelstrategie: zelfde logica omgekeerd.
         """
         wants_heat = self._hvac_mode in (HVACMode.HEAT, HVACMode.HEAT_COOL)
-        wants_cool = self._hvac_mode in (HVACMode.COOL, HVACMode.HEAT_COOL) or (
-            self._hvac_mode == HVACMode.HEAT and self._ac_mode
-        )
+        wants_cool = self._hvac_mode in (HVACMode.COOL, HVACMode.HEAT_COOL)
 
         too_cold = current < (target - self._cold_tolerance)
         too_hot  = current > (target + self._hot_tolerance)
@@ -1436,9 +1434,7 @@ class SmartClimate(ClimateEntity, RestoreEntity):
 
     async def _control_hysteresis(self, current: float, target: float) -> None:
         wants_heat = self._hvac_mode in (HVACMode.HEAT, HVACMode.HEAT_COOL)
-        wants_cool = self._hvac_mode in (HVACMode.COOL, HVACMode.HEAT_COOL) or (
-            self._hvac_mode == HVACMode.HEAT and self._ac_mode
-        )
+        wants_cool = self._hvac_mode in (HVACMode.COOL, HVACMode.HEAT_COOL)
         if not self._can_switch():
             return
 
@@ -1462,9 +1458,7 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         self._pid_output = self._pid.compute(target, current)
         on_thresh, off_thresh = 60.0, 40.0
         wants_heat = self._hvac_mode in (HVACMode.HEAT, HVACMode.HEAT_COOL)
-        wants_cool = self._hvac_mode in (HVACMode.COOL, HVACMode.HEAT_COOL) or (
-            self._hvac_mode == HVACMode.HEAT and self._ac_mode
-        )
+        wants_cool = self._hvac_mode in (HVACMode.COOL, HVACMode.HEAT_COOL)
         if not self._can_switch():
             return
 
