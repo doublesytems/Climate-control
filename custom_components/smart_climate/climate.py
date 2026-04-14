@@ -82,6 +82,9 @@ from .const import (
     ATTR_WEATHER_COMPENSATION,
     ATTR_WINDOW_OPEN,
     ATTR_WINDOW_OPEN_SINCE,
+    AC_IDLE_FAN_ONLY,
+    AC_IDLE_OFF,
+    CONF_AC_IDLE_MODE,
     CONF_AC_MODE,
     CONF_ALGORITHM,
     CONF_BOOST_DURATION,
@@ -140,6 +143,7 @@ from .const import (
     DEFAULT_WEATHER_SLOPE,
     DEFAULT_WINDOW_OPEN_DURATION,
     DEFAULT_WINDOW_TEMP_DROP,
+    DEFAULT_AC_IDLE_MODE,
     DEFAULT_CASCADE_DEACTIVATE_DELAY,
     DEFAULT_CASCADE_TEMP_THRESHOLD,
     DEFAULT_CASCADE_TIMEOUT,
@@ -220,6 +224,7 @@ async def async_setup_entry(
         cascade_timeout_min=int(d.get(CONF_CASCADE_TIMEOUT, DEFAULT_CASCADE_TIMEOUT)),
         cascade_temp_threshold=float(d.get(CONF_CASCADE_TEMP_THRESHOLD, DEFAULT_CASCADE_TEMP_THRESHOLD)),
         cascade_deactivate_delay_min=int(d.get(CONF_CASCADE_DEACTIVATE_DELAY, DEFAULT_CASCADE_DEACTIVATE_DELAY)),
+        ac_idle_mode=d.get(CONF_AC_IDLE_MODE, DEFAULT_AC_IDLE_MODE),
     )
 
     # Load persistent storage (learned rates etc.)
@@ -394,6 +399,7 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         cascade_timeout_min: int,
         cascade_temp_threshold: float,
         cascade_deactivate_delay_min: int,
+        ac_idle_mode: str = AC_IDLE_OFF,
     ) -> None:
         self.hass = hass
         self._config_entry = config_entry
@@ -510,6 +516,7 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         self._cascade_timeout_min = cascade_timeout_min
         self._cascade_temp_threshold = cascade_temp_threshold
         self._cascade_deactivate_delay_min = cascade_deactivate_delay_min
+        self._ac_idle_mode = ac_idle_mode
 
         self._cascade_primary_heat_on: bool = False
         self._cascade_primary_cool_on: bool = False
@@ -1410,10 +1417,11 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                         blocking=True,
                     )
             else:
+                idle_hvac = HVACMode.FAN_ONLY if self._ac_idle_mode == AC_IDLE_FAN_ONLY else HVACMode.OFF
                 await self.hass.services.async_call(
                     "climate",
                     "set_hvac_mode",
-                    {"entity_id": entity_id, "hvac_mode": HVACMode.OFF},
+                    {"entity_id": entity_id, "hvac_mode": idle_hvac},
                     blocking=True,
                 )
         elif domain in ("switch", "input_boolean"):
@@ -1596,9 +1604,12 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                 domain, service, {"entity_id": entity_id}, blocking=True
             )
         elif domain == "climate":
-            hvac_mode = HVACMode.HEAT if turn_on else HVACMode.OFF
-            if self._ac_mode and turn_on:
-                hvac_mode = HVACMode.COOL
+            if turn_on:
+                hvac_mode = HVACMode.COOL if self._ac_mode else HVACMode.HEAT
+            elif self._ac_idle_mode == AC_IDLE_FAN_ONLY:
+                hvac_mode = HVACMode.FAN_ONLY
+            else:
+                hvac_mode = HVACMode.OFF
             await self.hass.services.async_call(
                 "climate",
                 "set_hvac_mode",

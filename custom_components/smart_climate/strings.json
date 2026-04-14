@@ -85,7 +85,8 @@
           "weather_slope": "Weerscompensatie helling (°C/°C)",
           "weather_outside_ref": "Referentie buitentemperatuur (°C)",
           "heater_watt": "Vermogen verwarming (Watt)",
-          "cooler_watt": "Vermogen koeling (Watt)"
+          "cooler_watt": "Vermogen koeling (Watt)",
+          "ac_idle_mode": "AC ruststand bij doel bereikt"
         }
       }
     },
@@ -145,6 +146,12 @@
         "hysteresis": "Hysterese (aan/uit)",
         "pid": "PID-regelaar",
         "predictive": "Voorspellend"
+      }
+    },
+    "ac_idle_mode": {
+      "options": {
+        "off": "Volledig uit (standaard)",
+        "fan_only": "Ventilator aan, compressor uit (quiet)"
       }
     }
   }

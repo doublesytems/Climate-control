@@ -85,7 +85,8 @@
           "weather_slope": "Weather compensation slope (°C/°C)",
           "weather_outside_ref": "Reference outside temperature (°C)",
           "heater_watt": "Heater power (Watt)",
-          "cooler_watt": "Cooler power (Watt)"
+          "cooler_watt": "Cooler power (Watt)",
+          "ac_idle_mode": "AC idle mode when target reached"
         }
       }
     },
@@ -145,6 +146,12 @@
         "hysteresis": "Hysteresis (on/off)",
         "pid": "PID controller",
         "predictive": "Predictive (learns heating/cooling rate)"
+      }
+    },
+    "ac_idle_mode": {
+      "options": {
+        "off": "Fully off (default)",
+        "fan_only": "Fan only, compressor off (quiet)"
       }
     }
   }

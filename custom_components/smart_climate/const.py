@@ -29,6 +29,12 @@ CONF_PID_KI = "pid_ki"
 CONF_PID_KD = "pid_kd"
 CONF_MIN_CYCLE_DURATION = "min_cycle_duration"
 CONF_AC_MODE = "ac_mode"
+CONF_AC_IDLE_MODE = "ac_idle_mode"
+
+# AC idle mode opties
+AC_IDLE_OFF = "off"           # Airco volledig uit (standaard)
+AC_IDLE_FAN_ONLY = "fan_only" # Ventilator aan, compressor uit
+DEFAULT_AC_IDLE_MODE = AC_IDLE_OFF
 
 # Presets
 CONF_PRESET_COMFORT_TEMP = "preset_comfort_temp"

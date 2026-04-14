@@ -14,6 +14,8 @@ from .const import (
     ALGORITHMS,
     ALGORITHM_HYSTERESIS,
     ALGORITHM_PID,
+    AC_IDLE_OFF,
+    CONF_AC_IDLE_MODE,
     CONF_AC_MODE,
     CONF_ALGORITHM,
     CONF_BOOST_DURATION,
@@ -76,6 +78,7 @@ from .const import (
     DEFAULT_PUMP_ANTI_SEIZE_INTERVAL,
     DEFAULT_CASCADE_DEACTIVATE_DELAY,
     DEFAULT_CASCADE_TEMP_THRESHOLD,
+    DEFAULT_AC_IDLE_MODE,
     DEFAULT_CASCADE_TIMEOUT,
     DEFAULT_PUMP_EXERCISE_TIME,
     DEFAULT_PUMP_MIN_RUN_TIME,
@@ -213,6 +216,13 @@ STEP_ADVANCED_SCHEMA = vol.Schema(
         ),
         vol.Optional(CONF_COOLER_WATT, default=0): selector.NumberSelector(
             selector.NumberSelectorConfig(min=0, max=10000, step=50, mode="box")
+        ),
+        # AC ruststand
+        vol.Optional(CONF_AC_IDLE_MODE, default=DEFAULT_AC_IDLE_MODE): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=["off", "fan_only"],
+                translation_key="ac_idle_mode",
+            )
         ),
     }
 )
