@@ -1243,6 +1243,9 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                     self._cascade_primary_start_time = now
                     self._cascade_reason = "primaire verwarming actief"
                     _LOGGER.info("[%s] Cascade HEAT: primaire (airco) aan", self.name)
+                else:
+                    # Primaire al aan — stuur bijgewerkte doeltemperatuur door
+                    await self._async_update_primary_temperature(self._cascade_primary_heater)
 
                 # Stap 2: secundaire nodig?
                 if self._cascade_primary_heat_on and self._cascade_primary_start_time:
@@ -1297,6 +1300,9 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                     self._cascade_primary_start_time = now
                     self._cascade_reason = "primaire koeling actief"
                     _LOGGER.info("[%s] Cascade COOL: primaire (airco) aan", self.name)
+                else:
+                    # Primaire al aan — stuur bijgewerkte doeltemperatuur door
+                    await self._async_update_primary_temperature(self._cascade_primary_cooler)
 
                 if self._cascade_primary_cool_on and self._cascade_primary_start_time:
                     elapsed = (now - self._cascade_primary_start_time).total_seconds() / 60
@@ -1333,6 +1339,20 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                     self._cascade_primary_cool_on = False
                     self._cascade_primary_start_time = None
                     self._cascade_reason = "doel bereikt, primaire koeling uit"
+
+    async def _async_update_primary_temperature(self, entity_id: str) -> None:
+        """Stuur de huidige doeltemperatuur naar de primaire entiteit (airco) als die al aan is."""
+        domain = entity_id.split(".")[0]
+        if domain == "climate" and self._attr_target_temperature:
+            await self.hass.services.async_call(
+                "climate",
+                "set_temperature",
+                {
+                    "entity_id": entity_id,
+                    "temperature": self.effective_target_temperature,
+                },
+                blocking=True,
+            )
 
     async def _async_switch_primary(
         self, entity_id: str, turn_on: bool, mode: str
