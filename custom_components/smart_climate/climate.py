@@ -1543,7 +1543,7 @@ class SmartClimate(ClimateEntity, RestoreEntity):
     async def _async_turn_on_heater(self) -> None:
         if not self._heater_entity_id:
             return
-        await self._async_switch(self._heater_entity_id, True)
+        await self._async_switch(self._heater_entity_id, True, "heat")
         if not self._heater_on:
             self._heater_on_since = dt_util.utcnow()
             # Start session tracking for self-learning
@@ -1557,7 +1557,7 @@ class SmartClimate(ClimateEntity, RestoreEntity):
     async def _async_turn_off_heater(self) -> None:
         if not self._heater_entity_id:
             return
-        await self._async_switch(self._heater_entity_id, False)
+        await self._async_switch(self._heater_entity_id, False, "heat")
         if self._heater_on and self._heater_on_since:
             self._heater_runtime_today += (
                 dt_util.utcnow() - self._heater_on_since
@@ -1572,7 +1572,7 @@ class SmartClimate(ClimateEntity, RestoreEntity):
     async def _async_turn_on_cooler(self) -> None:
         if not self._cooler_entity_id:
             return
-        await self._async_switch(self._cooler_entity_id, True)
+        await self._async_switch(self._cooler_entity_id, True, "cool")
         if not self._cooler_on:
             self._cooler_on_since = dt_util.utcnow()
         self._cooler_on = True
@@ -1582,7 +1582,7 @@ class SmartClimate(ClimateEntity, RestoreEntity):
     async def _async_turn_off_cooler(self) -> None:
         if not self._cooler_entity_id:
             return
-        await self._async_switch(self._cooler_entity_id, False)
+        await self._async_switch(self._cooler_entity_id, False, "cool")
         if self._cooler_on and self._cooler_on_since:
             self._cooler_runtime_today += (
                 dt_util.utcnow() - self._cooler_on_since
@@ -1596,7 +1596,7 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         await self._async_turn_off_heater()
         await self._async_turn_off_cooler()
 
-    async def _async_switch(self, entity_id: str, turn_on: bool) -> None:
+    async def _async_switch(self, entity_id: str, turn_on: bool, mode: str = "heat") -> None:
         domain = entity_id.split(".")[0]
         if domain in ("switch", "input_boolean"):
             service = "turn_on" if turn_on else "turn_off"
@@ -1605,7 +1605,7 @@ class SmartClimate(ClimateEntity, RestoreEntity):
             )
         elif domain == "climate":
             if turn_on:
-                hvac_mode = HVACMode.COOL if self._ac_mode else HVACMode.HEAT
+                hvac_mode = HVACMode.COOL if mode == "cool" else HVACMode.HEAT
             elif self._ac_idle_mode == AC_IDLE_FAN_ONLY:
                 hvac_mode = HVACMode.FAN_ONLY
             else:
