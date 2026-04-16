@@ -90,6 +90,34 @@ CONF_TEMP_RAMP_INTERVAL = "temp_ramp_interval"  # minuten per stap
 # Persistent notification bij vertraging
 CONF_NOTIFY_ON_DELAY = "notify_on_delay"
 CONF_NOTIFY_DELAY_MIN = "notify_delay_min"
+CONF_NOTIFY_SERVICE = "notify_service"       # optionele mobiele push-service
+
+# Vorstbeveiliging
+CONF_FROST_PROTECTION_TEMP = "frost_protection_temp"
+
+# Sensorfailsafe
+CONF_SENSOR_TIMEOUT_MIN = "sensor_timeout_min"
+
+# Vochtcomfortcorrectie
+CONF_HUMIDITY_SENSOR = "humidity_sensor"
+CONF_HUMIDITY_REF = "humidity_ref"
+CONF_HUMIDITY_FACTOR = "humidity_factor"
+
+# Prijsgestuurde setback
+CONF_ENERGY_PRICE_SENSOR = "energy_price_sensor"
+CONF_ENERGY_PRICE_THRESHOLD = "energy_price_threshold"
+CONF_ENERGY_PRICE_SETBACK = "energy_price_setback"
+
+# Hold-modus
+CONF_HOLD_TEMP = "hold_temp"       # intern, niet in config flow
+
+# Seizoensdetectie
+CONF_AUTO_MODE = "auto_mode"
+CONF_AUTO_MODE_COOL_THRESHOLD = "auto_mode_cool_threshold"
+CONF_AUTO_MODE_HEAT_THRESHOLD = "auto_mode_heat_threshold"
+
+# HA Calendar koppeling
+CONF_VACATION_CALENDAR = "vacation_calendar"
 
 # Pump
 CONF_PUMP_ENTITY = "pump_entity"
@@ -151,6 +179,14 @@ DEFAULT_CASCADE_INSTANT_THRESHOLD = 3.0  # °C tekort → meteen secundaire insc
 DEFAULT_TEMP_RAMP_STEP = 0.5             # °C per ramp-stap
 DEFAULT_TEMP_RAMP_INTERVAL = 5           # minuten per ramp-stap
 DEFAULT_NOTIFY_DELAY_MIN = 60            # minuten wachten voor notificatie
+DEFAULT_FROST_PROTECTION_TEMP = 5.0      # °C — vorst drempel
+DEFAULT_SENSOR_TIMEOUT_MIN = 30          # minuten — sensor mag maximaal stil zijn
+DEFAULT_HUMIDITY_REF = 50.0              # % — referentievochtigheid
+DEFAULT_HUMIDITY_FACTOR = 0.05           # °C aanpassing per % afwijking
+DEFAULT_ENERGY_PRICE_THRESHOLD = 0.25    # EUR/kWh — drempel voor dure energie
+DEFAULT_ENERGY_PRICE_SETBACK = 2.0       # °C — setback bij dure energie
+DEFAULT_AUTO_MODE_COOL_THRESHOLD = 22.0  # °C buiten → switch naar koelen
+DEFAULT_AUTO_MODE_HEAT_THRESHOLD = 18.0  # °C buiten → switch naar verwarmen
 
 DEFAULT_WEATHER_SLOPE = 0.5
 DEFAULT_WEATHER_OUTSIDE_REF = 15.0
@@ -170,6 +206,12 @@ DEFAULT_CASCADE_DEACTIVATE_DELAY = 10 # minuten secundair nog aan na bereiken do
 
 # Notification
 NOTIFICATION_ID_PREFIX = "smart_climate_delay_"
+
+# Services (hold-modus)
+SERVICE_SET_HOLD = "set_hold"
+SERVICE_CLEAR_HOLD = "clear_hold"
+ATTR_HOLD_TEMP = "temperature"
+ATTR_HOLD_DURATION = "duration"  # uren
 
 # Pump
 DEFAULT_PUMP_ANTI_SEIZE_INTERVAL = 24   # hours

@@ -94,7 +94,20 @@
           "temp_ramp_step": "Stapgrootte (°C per stap)",
           "temp_ramp_interval": "Stapinterval (minuten)",
           "notify_on_delay": "Notificatie als doel niet bereikt",
-          "notify_delay_min": "Wachttijd voor notificatie (minuten)"
+          "notify_delay_min": "Wachttijd voor notificatie (minuten)",
+          "notify_service": "Mobiele notificatiedienst (bijv. notify.mobile_app_xxx)",
+          "frost_protection_temp": "Vorstbeveiligingstemperatuur (°C, leeg = uit)",
+          "sensor_timeout_min": "Sensorfailsafe: max. stilte (minuten, leeg = uit)",
+          "humidity_sensor": "Vochtigheidssensor (optioneel)",
+          "humidity_ref": "Referentievochtigheid (%)",
+          "humidity_factor": "Comfortfactor per % afwijking (°C/%)",
+          "energy_price_sensor": "Energieprijssensor (optioneel)",
+          "energy_price_threshold": "Drempelprijs voor setback (EUR/kWh)",
+          "energy_price_setback": "Setback bij dure energie (°C)",
+          "auto_mode": "Seizoensdetectie (automatisch HEAT/COOL wisselen)",
+          "auto_mode_cool_threshold": "Buitentemperatuur voor koelen (°C)",
+          "auto_mode_heat_threshold": "Buitentemperatuur voor verwarmen (°C)",
+          "vacation_calendar": "Vakantiekalender (HA calendar entiteit)"
         }
       }
     },
@@ -166,7 +179,20 @@
           "temp_ramp_step": "Stapgrootte (°C)",
           "temp_ramp_interval": "Stapinterval (min)",
           "notify_on_delay": "Notificatie bij vertraging",
-          "notify_delay_min": "Wachttijd notificatie (min)"
+          "notify_delay_min": "Wachttijd notificatie (min)",
+          "notify_service": "Mobiele notificatiedienst",
+          "frost_protection_temp": "Vorstbeveiligingstemperatuur (°C)",
+          "sensor_timeout_min": "Sensorfailsafe stilte (min)",
+          "humidity_sensor": "Vochtigheidssensor",
+          "humidity_ref": "Referentievochtigheid (%)",
+          "humidity_factor": "Comfortfactor (°C/%)",
+          "energy_price_sensor": "Energieprijssensor",
+          "energy_price_threshold": "Drempelprijs (EUR/kWh)",
+          "energy_price_setback": "Setback bij dure energie (°C)",
+          "auto_mode": "Seizoensdetectie",
+          "auto_mode_cool_threshold": "Drempel koelen (°C buiten)",
+          "auto_mode_heat_threshold": "Drempel verwarmen (°C buiten)",
+          "vacation_calendar": "Vakantiekalender"
         }
       },
       "cascade_opt": {

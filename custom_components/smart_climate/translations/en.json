@@ -94,7 +94,20 @@
           "temp_ramp_step": "Step size (°C per step)",
           "temp_ramp_interval": "Step interval (minutes)",
           "notify_on_delay": "Notify when target not reached",
-          "notify_delay_min": "Delay before notification (minutes)"
+          "notify_delay_min": "Delay before notification (minutes)",
+          "notify_service": "Mobile notification service (e.g. notify.mobile_app_xxx)",
+          "frost_protection_temp": "Frost protection temperature (°C, empty = disabled)",
+          "sensor_timeout_min": "Sensor failsafe: max silence (minutes, empty = disabled)",
+          "humidity_sensor": "Humidity sensor (optional)",
+          "humidity_ref": "Reference humidity (%)",
+          "humidity_factor": "Comfort factor per % deviation (°C/%)",
+          "energy_price_sensor": "Energy price sensor (optional)",
+          "energy_price_threshold": "Price threshold for setback (EUR/kWh)",
+          "energy_price_setback": "Setback when energy is expensive (°C)",
+          "auto_mode": "Season detection (auto switch HEAT/COOL)",
+          "auto_mode_cool_threshold": "Outside temperature for cooling (°C)",
+          "auto_mode_heat_threshold": "Outside temperature for heating (°C)",
+          "vacation_calendar": "Vacation calendar (HA calendar entity)"
         }
       }
     },
@@ -166,7 +179,20 @@
           "temp_ramp_step": "Step size (°C)",
           "temp_ramp_interval": "Step interval (min)",
           "notify_on_delay": "Notify on delay",
-          "notify_delay_min": "Notification delay (min)"
+          "notify_delay_min": "Notification delay (min)",
+          "notify_service": "Mobile notification service",
+          "frost_protection_temp": "Frost protection temperature (°C)",
+          "sensor_timeout_min": "Sensor failsafe silence (min)",
+          "humidity_sensor": "Humidity sensor",
+          "humidity_ref": "Reference humidity (%)",
+          "humidity_factor": "Comfort factor (°C/%)",
+          "energy_price_sensor": "Energy price sensor",
+          "energy_price_threshold": "Price threshold (EUR/kWh)",
+          "energy_price_setback": "Setback (°C)",
+          "auto_mode": "Season detection",
+          "auto_mode_cool_threshold": "Cooling threshold (°C outside)",
+          "auto_mode_heat_threshold": "Heating threshold (°C outside)",
+          "vacation_calendar": "Vacation calendar"
         }
       },
       "cascade_opt": {

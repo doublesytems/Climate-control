@@ -126,6 +126,7 @@ from .const import (
     CONF_CASCADE_INSTANT_THRESHOLD,
     CONF_NOTIFY_ON_DELAY,
     CONF_NOTIFY_DELAY_MIN,
+    CONF_NOTIFY_SERVICE,
     CONF_TEMP_RAMP,
     CONF_TEMP_RAMP_STEP,
     CONF_TEMP_RAMP_INTERVAL,
@@ -134,6 +135,18 @@ from .const import (
     CONF_WINDOW_OPEN_DURATION,
     CONF_WINDOW_TEMP_DROP,
     CONF_WINDOW_TEMP_DROP_TIME,
+    CONF_FROST_PROTECTION_TEMP,
+    CONF_SENSOR_TIMEOUT_MIN,
+    CONF_HUMIDITY_SENSOR,
+    CONF_HUMIDITY_REF,
+    CONF_HUMIDITY_FACTOR,
+    CONF_ENERGY_PRICE_SENSOR,
+    CONF_ENERGY_PRICE_THRESHOLD,
+    CONF_ENERGY_PRICE_SETBACK,
+    CONF_AUTO_MODE,
+    CONF_AUTO_MODE_COOL_THRESHOLD,
+    CONF_AUTO_MODE_HEAT_THRESHOLD,
+    CONF_VACATION_CALENDAR,
     DEFAULT_BOOST_DURATION,
     DEFAULT_MAX_TEMP,
     DEFAULT_MIN_TEMP,
@@ -160,7 +173,19 @@ from .const import (
     DEFAULT_NOTIFY_DELAY_MIN,
     DEFAULT_TEMP_RAMP_STEP,
     DEFAULT_TEMP_RAMP_INTERVAL,
+    DEFAULT_FROST_PROTECTION_TEMP,
+    DEFAULT_SENSOR_TIMEOUT_MIN,
+    DEFAULT_HUMIDITY_REF,
+    DEFAULT_HUMIDITY_FACTOR,
+    DEFAULT_ENERGY_PRICE_THRESHOLD,
+    DEFAULT_ENERGY_PRICE_SETBACK,
+    DEFAULT_AUTO_MODE_COOL_THRESHOLD,
+    DEFAULT_AUTO_MODE_HEAT_THRESHOLD,
     NOTIFICATION_ID_PREFIX,
+    SERVICE_SET_HOLD,
+    SERVICE_CLEAR_HOLD,
+    ATTR_HOLD_TEMP,
+    ATTR_HOLD_DURATION,
     DEFAULT_WINDOW_TEMP_DROP_TIME,
     DOMAIN,
     EMA_ALPHA,
@@ -247,7 +272,33 @@ async def async_setup_entry(
         temp_ramp_interval=int(d.get(CONF_TEMP_RAMP_INTERVAL, DEFAULT_TEMP_RAMP_INTERVAL)),
         notify_on_delay=bool(d.get(CONF_NOTIFY_ON_DELAY, False)),
         notify_delay_min=int(d.get(CONF_NOTIFY_DELAY_MIN, DEFAULT_NOTIFY_DELAY_MIN)),
+        notify_service=d.get(CONF_NOTIFY_SERVICE),
+        frost_protection_temp=float(d[CONF_FROST_PROTECTION_TEMP]) if d.get(CONF_FROST_PROTECTION_TEMP) is not None else None,
+        sensor_timeout_min=int(d.get(CONF_SENSOR_TIMEOUT_MIN, DEFAULT_SENSOR_TIMEOUT_MIN)) if d.get(CONF_SENSOR_TIMEOUT_MIN) else None,
+        humidity_sensor=d.get(CONF_HUMIDITY_SENSOR),
+        humidity_ref=float(d.get(CONF_HUMIDITY_REF, DEFAULT_HUMIDITY_REF)),
+        humidity_factor=float(d.get(CONF_HUMIDITY_FACTOR, DEFAULT_HUMIDITY_FACTOR)),
+        energy_price_sensor=d.get(CONF_ENERGY_PRICE_SENSOR),
+        energy_price_threshold=float(d.get(CONF_ENERGY_PRICE_THRESHOLD, DEFAULT_ENERGY_PRICE_THRESHOLD)),
+        energy_price_setback=float(d.get(CONF_ENERGY_PRICE_SETBACK, DEFAULT_ENERGY_PRICE_SETBACK)),
+        auto_mode=bool(d.get(CONF_AUTO_MODE, False)),
+        auto_mode_cool_threshold=float(d.get(CONF_AUTO_MODE_COOL_THRESHOLD, DEFAULT_AUTO_MODE_COOL_THRESHOLD)),
+        auto_mode_heat_threshold=float(d.get(CONF_AUTO_MODE_HEAT_THRESHOLD, DEFAULT_AUTO_MODE_HEAT_THRESHOLD)),
+        vacation_calendar=d.get(CONF_VACATION_CALENDAR),
     )
+
+    # Registreer hold-modus services
+    async def _async_handle_set_hold(call) -> None:
+        temp = call.data.get(ATTR_HOLD_TEMP)
+        duration_h = call.data.get(ATTR_HOLD_DURATION, 2)
+        if temp is not None:
+            await entity.async_set_hold(float(temp), float(duration_h))
+
+    async def _async_handle_clear_hold(call) -> None:
+        await entity.async_clear_hold()
+
+    hass.services.async_register(DOMAIN, SERVICE_SET_HOLD, _async_handle_set_hold)
+    hass.services.async_register(DOMAIN, SERVICE_CLEAR_HOLD, _async_handle_clear_hold)
 
     # Load persistent storage (learned rates etc.)
     await entity.async_load_storage()
@@ -430,6 +481,19 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         temp_ramp_interval: int = DEFAULT_TEMP_RAMP_INTERVAL,
         notify_on_delay: bool = False,
         notify_delay_min: int = DEFAULT_NOTIFY_DELAY_MIN,
+        notify_service: str | None = None,
+        frost_protection_temp: float | None = None,
+        sensor_timeout_min: int | None = None,
+        humidity_sensor: str | None = None,
+        humidity_ref: float = DEFAULT_HUMIDITY_REF,
+        humidity_factor: float = DEFAULT_HUMIDITY_FACTOR,
+        energy_price_sensor: str | None = None,
+        energy_price_threshold: float = DEFAULT_ENERGY_PRICE_THRESHOLD,
+        energy_price_setback: float = DEFAULT_ENERGY_PRICE_SETBACK,
+        auto_mode: bool = False,
+        auto_mode_cool_threshold: float = DEFAULT_AUTO_MODE_COOL_THRESHOLD,
+        auto_mode_heat_threshold: float = DEFAULT_AUTO_MODE_HEAT_THRESHOLD,
+        vacation_calendar: str | None = None,
     ) -> None:
         self.hass = hass
         self._config_entry = config_entry
@@ -572,8 +636,43 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         # Persistent notification bij vertraging
         self._notify_on_delay = notify_on_delay
         self._notify_delay_min = notify_delay_min
+        self._notify_service = notify_service
         self._heat_cool_start_time: datetime | None = None
         self._notify_sent: bool = False
+
+        # Vorstbeveiliging
+        self._frost_protection_temp = frost_protection_temp
+        self._frost_active: bool = False
+
+        # Sensorfailsafe
+        self._sensor_timeout_min = sensor_timeout_min
+        self._last_sensor_update: datetime | None = None
+
+        # Vochtcomfortcorrectie
+        self._humidity_sensor = humidity_sensor
+        self._humidity_ref = humidity_ref
+        self._humidity_factor = humidity_factor
+        self._current_humidity: float | None = None
+        self._humidity_adj: float = 0.0
+
+        # Prijsgestuurde setback
+        self._energy_price_sensor = energy_price_sensor
+        self._energy_price_threshold = energy_price_threshold
+        self._energy_price_setback = energy_price_setback
+        self._current_energy_price: float | None = None
+        self._price_setback_active: bool = False
+
+        # Hold-modus
+        self._hold_temp: float | None = None
+        self._hold_end: datetime | None = None
+
+        # Seizoensdetectie
+        self._auto_mode = auto_mode
+        self._auto_mode_cool_threshold = auto_mode_cool_threshold
+        self._auto_mode_heat_threshold = auto_mode_heat_threshold
+
+        # HA Calendar koppeling
+        self._vacation_calendar = vacation_calendar
 
         # Self-learning
         self._learning_enabled = learning_enabled
@@ -721,6 +820,30 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                 )
             )
 
+        # Track humidity sensor
+        if self._humidity_sensor:
+            self.async_on_remove(
+                async_track_state_change_event(
+                    self.hass, [self._humidity_sensor], self._async_humidity_changed
+                )
+            )
+
+        # Track energy price sensor
+        if self._energy_price_sensor:
+            self.async_on_remove(
+                async_track_state_change_event(
+                    self.hass, [self._energy_price_sensor], self._async_price_changed
+                )
+            )
+
+        # Track vacation calendar
+        if self._vacation_calendar:
+            self.async_on_remove(
+                async_track_state_change_event(
+                    self.hass, [self._vacation_calendar], self._async_calendar_changed
+                )
+            )
+
         # Keep-alive interval
         if self._keep_alive:
             self.async_on_remove(
@@ -748,6 +871,18 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                 outside = self.hass.states.get(self._outside_sensor_entity_id)
                 if outside and outside.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE):
                     self._update_outside_temp(outside)
+            if self._humidity_sensor:
+                hum = self.hass.states.get(self._humidity_sensor)
+                if hum and hum.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE):
+                    self._update_humidity(hum)
+            if self._energy_price_sensor:
+                price = self.hass.states.get(self._energy_price_sensor)
+                if price and price.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE):
+                    self._update_energy_price(price)
+            if self._vacation_calendar:
+                cal = self.hass.states.get(self._vacation_calendar)
+                if cal:
+                    self._update_vacation_calendar(cal)
             self._update_presence()
             self.hass.async_create_task(self._async_control_heating())
 
@@ -776,9 +911,19 @@ class SmartClimate(ClimateEntity, RestoreEntity):
 
     @property
     def effective_target_temperature(self) -> float:
-        """Target including preset offset and weather compensation."""
+        """Target including preset offset, weather compensation, humidity and price adjustments."""
+        # Hold-modus overschrijft alles
+        if self._hold_temp is not None and self._hold_end and dt_util.utcnow() <= self._hold_end:
+            return self._hold_temp
         base = self._attr_target_temperature or DEFAULT_TARGET_TEMP
-        return round(base + self._weather_adj, 1)
+        adj = self._weather_adj - self._humidity_adj
+        if self._price_setback_active:
+            # Setback: bij verwarmen lager doel, bij koelen hoger doel
+            if self._hvac_mode in (HVACMode.HEAT, HVACMode.HEAT_COOL):
+                adj -= self._energy_price_setback
+            elif self._hvac_mode == HVACMode.COOL:
+                adj += self._energy_price_setback
+        return round(base + adj, 1)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -795,6 +940,10 @@ class SmartClimate(ClimateEntity, RestoreEntity):
             ATTR_COOLER_RUNTIME_TODAY: round(self.cooler_runtime_today / 60, 3),
             "learning_enabled": self._learning_enabled,
             "early_start_active": self._early_start_active,
+            "frost_active": self._frost_active,
+            "price_setback_active": self._price_setback_active,
+            "humidity_adjustment": round(self._humidity_adj, 2) if self._humidity_sensor else None,
+            "auto_mode": self._auto_mode,
         }
         if self._learned_heating_rate is not None:
             attrs["learned_heating_rate_c_per_min"] = round(self._learned_heating_rate, 4)
@@ -809,6 +958,10 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                 attrs[ATTR_CASCADE_SECONDARY_SINCE] = round(elapsed, 1)
         if self._window_open and self._window_open_since:
             attrs[ATTR_WINDOW_OPEN_SINCE] = self._window_open_since.isoformat()
+        if self._hold_temp is not None and self._hold_end and dt_util.utcnow() <= self._hold_end:
+            remaining_h = (self._hold_end - dt_util.utcnow()).total_seconds() / 3600
+            attrs["hold_temp"] = self._hold_temp
+            attrs["hold_remaining_h"] = round(remaining_h, 2)
         if self._boost_end:
             remaining = max(0.0, (self._boost_end - now).total_seconds() / 60)
             attrs[ATTR_BOOST_END] = self._boost_end.isoformat()
@@ -952,6 +1105,25 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         self.async_write_ha_state()
 
     # ------------------------------------------------------------------
+    # Hold-modus
+    # ------------------------------------------------------------------
+
+    async def async_set_hold(self, temperature: float, duration_h: float = 2.0) -> None:
+        """Houd temperatuur vast voor `duration_h` uur, dan schema hervatten."""
+        self._hold_temp = temperature
+        self._hold_end = dt_util.utcnow() + timedelta(hours=duration_h)
+        _LOGGER.info("[%s] Hold: %.1f°C voor %.1f uur", self.name, temperature, duration_h)
+        await self._async_control_heating()
+        self.async_write_ha_state()
+
+    async def async_clear_hold(self) -> None:
+        """Annuleer hold-modus."""
+        self._hold_temp = None
+        self._hold_end = None
+        await self._async_control_heating()
+        self.async_write_ha_state()
+
+    # ------------------------------------------------------------------
     # Schedule management
     # ------------------------------------------------------------------
 
@@ -1054,6 +1226,7 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         try:
             temp = float(state.state)
             self._attr_current_temperature = temp
+            self._last_sensor_update = dt_util.utcnow()
             self._temp_history.append((dt_util.utcnow(), temp))
             if self._window_detection:
                 self._check_window_open()
@@ -1073,6 +1246,49 @@ class SmartClimate(ClimateEntity, RestoreEntity):
             return
         delta = self._weather_outside_ref - self._outside_temp
         self._weather_adj = round(self._weather_slope * delta, 2)
+
+    def _update_humidity(self, state) -> None:
+        try:
+            self._current_humidity = float(state.state)
+            if self._humidity_sensor:
+                # Hoge vochtigheid = voelt warmer → doel verlagen
+                deviation = self._current_humidity - self._humidity_ref
+                self._humidity_adj = round(deviation * self._humidity_factor, 2)
+        except (ValueError, TypeError):
+            pass
+
+    def _update_energy_price(self, state) -> None:
+        try:
+            self._current_energy_price = float(state.state)
+            self._price_setback_active = (
+                self._current_energy_price >= self._energy_price_threshold
+            )
+            if self._price_setback_active:
+                _LOGGER.info(
+                    "[%s] Energieprijs %.3f ≥ %.3f → setback %.1f°C actief",
+                    self.name, self._current_energy_price,
+                    self._energy_price_threshold, self._energy_price_setback,
+                )
+        except (ValueError, TypeError):
+            pass
+
+    def _update_vacation_calendar(self, state) -> None:
+        """Sync vakantiestand met HA calendar entiteit."""
+        if state.state == STATE_ON:
+            # Kalender-event actief → vakantietemperatuur
+            if not self._vacation_start:
+                self._vacation_temp = self._preset_temps.get(PRESET_AWAY, self._vacation_temp)
+                self._vacation_start = dt_util.now().date()
+                self._vacation_end = dt_util.now().date()  # dagelijks vernieuwd
+                _LOGGER.info("[%s] Vakantiekalender: vakantiestand actief", self.name)
+                self.hass.async_create_task(self._async_control_heating())
+        else:
+            # Geen actief event → vakantie beëindigen
+            if self._vacation_start:
+                self._vacation_start = None
+                self._vacation_end = None
+                _LOGGER.info("[%s] Vakantiekalender: vakantiestand beëindigd", self.name)
+                self.hass.async_create_task(self._async_control_heating())
 
     def _update_presence(self) -> None:
         if not self._presence_sensors:
@@ -1120,6 +1336,33 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         """Turn off heating/cooling while window is open."""
         if self._window_open:
             await self._async_turn_off_all()
+
+    @callback
+    def _async_humidity_changed(self, event) -> None:
+        new_state = event.data.get("new_state")
+        if new_state is None or new_state.state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
+            return
+        self._update_humidity(new_state)
+        self.async_write_ha_state()
+
+    @callback
+    def _async_price_changed(self, event) -> None:
+        new_state = event.data.get("new_state")
+        if new_state is None or new_state.state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
+            return
+        was_active = self._price_setback_active
+        self._update_energy_price(new_state)
+        if self._price_setback_active != was_active:
+            self.hass.async_create_task(self._async_control_heating())
+        self.async_write_ha_state()
+
+    @callback
+    def _async_calendar_changed(self, event) -> None:
+        new_state = event.data.get("new_state")
+        if new_state is None:
+            return
+        self._update_vacation_calendar(new_state)
+        self.async_write_ha_state()
 
     @callback
     def _async_window_sensor_changed(self, event) -> None:
@@ -1320,6 +1563,38 @@ class SmartClimate(ClimateEntity, RestoreEntity):
     # ------------------------------------------------------------------
 
     async def _async_control_heating(self, _now=None) -> None:
+        # Sensorfailsafe: als sensor te lang stil is, alles uitzetten
+        if self._sensor_timeout_min is not None and self._last_sensor_update is not None:
+            age_min = (dt_util.utcnow() - self._last_sensor_update).total_seconds() / 60
+            if age_min > self._sensor_timeout_min:
+                _LOGGER.warning(
+                    "[%s] Sensorfailsafe: geen update in %.0f min → alles uit",
+                    self.name, age_min,
+                )
+                await self._async_turn_off_all()
+                return
+
+        # Vorstbeveiliging: verwarmen als temp onder vorstgrens, ook bij HVAC OFF
+        if self._frost_protection_temp is not None and self._attr_current_temperature is not None:
+            if self._attr_current_temperature < self._frost_protection_temp:
+                if not self._frost_active:
+                    _LOGGER.info(
+                        "[%s] Vorstbeveiliging actief: %.1f°C < %.1f°C",
+                        self.name, self._attr_current_temperature, self._frost_protection_temp,
+                    )
+                    self._frost_active = True
+                if self._heater_entity_id and not self._heater_on:
+                    await self._async_turn_on_heater()
+                elif self._cascade_primary_heater and not self._cascade_primary_heat_on:
+                    await self._async_switch_primary(self._cascade_primary_heater, True, "heat")
+                    self._cascade_primary_heat_on = True
+                self.async_write_ha_state()
+                return
+            elif self._frost_active:
+                _LOGGER.info("[%s] Vorstbeveiliging uit: temp hersteld", self.name)
+                self._frost_active = False
+                await self._async_turn_off_all()
+
         if self._hvac_mode == HVACMode.OFF:
             return
         if self._window_open:
@@ -1329,6 +1604,32 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         if self._boost_end and dt_util.utcnow() > self._boost_end:
             await self.async_clear_boost()
             return
+
+        # Check hold expiry
+        if self._hold_end and dt_util.utcnow() > self._hold_end:
+            self._hold_temp = None
+            self._hold_end = None
+            _LOGGER.info("[%s] Hold-modus verlopen", self.name)
+            self.async_write_ha_state()
+
+        # Seizoensdetectie: auto-switch HEAT/COOL op basis van buitentemperatuur
+        if self._auto_mode and self._outside_temp is not None:
+            if (self._outside_temp >= self._auto_mode_cool_threshold
+                    and self._hvac_mode == HVACMode.HEAT):
+                _LOGGER.info(
+                    "[%s] Seizoensdetectie: buiten %.1f°C ≥ %.1f°C → switch naar COOL",
+                    self.name, self._outside_temp, self._auto_mode_cool_threshold,
+                )
+                self._hvac_mode = HVACMode.COOL
+                self.async_write_ha_state()
+            elif (self._outside_temp <= self._auto_mode_heat_threshold
+                    and self._hvac_mode == HVACMode.COOL):
+                _LOGGER.info(
+                    "[%s] Seizoensdetectie: buiten %.1f°C ≤ %.1f°C → switch naar HEAT",
+                    self.name, self._outside_temp, self._auto_mode_heat_threshold,
+                )
+                self._hvac_mode = HVACMode.HEAT
+                self.async_write_ha_state()
 
         # Check vacation mode
         if self._vacation_start and self._vacation_end:
@@ -1777,19 +2078,29 @@ class SmartClimate(ClimateEntity, RestoreEntity):
     # ------------------------------------------------------------------
 
     async def _async_send_delay_notification(self) -> None:
-        """Stuur een persistent notification als de ruimte het doel niet haalt."""
+        """Stuur een persistent notification (en optioneel mobiel) als het doel niet gehaald wordt."""
+        title = f"Smart Climate — {self.name}"
+        message = (
+            f"De ruimte heeft na {self._notify_delay_min} minuten het "
+            "ingestelde doel nog niet bereikt."
+        )
         await self.hass.services.async_call(
             "persistent_notification",
             "create",
             {
-                "title": f"Smart Climate — {self.name}",
-                "message": (
-                    f"De ruimte heeft na {self._notify_delay_min} minuten het "
-                    "ingestelde doel nog niet bereikt."
-                ),
+                "title": title,
+                "message": message,
                 "notification_id": NOTIFICATION_ID_PREFIX + (self._attr_unique_id or ""),
             },
         )
+        if self._notify_service:
+            domain, service = self._notify_service.split(".", 1)
+            try:
+                await self.hass.services.async_call(
+                    domain, service, {"title": title, "message": message}
+                )
+            except Exception as exc:  # noqa: BLE001
+                _LOGGER.warning("[%s] Mobiele notificatie mislukt: %s", self.name, exc)
 
     async def _async_dismiss_notification(self) -> None:
         """Verwijder de persistent notification."""

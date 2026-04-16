@@ -22,10 +22,23 @@ from .const import (
     CONF_COOL_BLOCK_OUTSIDE_TEMP,
     CONF_NOTIFY_ON_DELAY,
     CONF_NOTIFY_DELAY_MIN,
+    CONF_NOTIFY_SERVICE,
     CONF_TEMP_RAMP,
     CONF_TEMP_RAMP_STEP,
     CONF_TEMP_RAMP_INTERVAL,
     CONF_WINDOW_SENSOR,
+    CONF_FROST_PROTECTION_TEMP,
+    CONF_SENSOR_TIMEOUT_MIN,
+    CONF_HUMIDITY_SENSOR,
+    CONF_HUMIDITY_REF,
+    CONF_HUMIDITY_FACTOR,
+    CONF_ENERGY_PRICE_SENSOR,
+    CONF_ENERGY_PRICE_THRESHOLD,
+    CONF_ENERGY_PRICE_SETBACK,
+    CONF_AUTO_MODE,
+    CONF_AUTO_MODE_COOL_THRESHOLD,
+    CONF_AUTO_MODE_HEAT_THRESHOLD,
+    CONF_VACATION_CALENDAR,
     CONF_BOOST_DURATION,
     CONF_COLD_TOLERANCE,
     CONF_COOLER,
@@ -93,6 +106,14 @@ from .const import (
     DEFAULT_NOTIFY_DELAY_MIN,
     DEFAULT_TEMP_RAMP_STEP,
     DEFAULT_TEMP_RAMP_INTERVAL,
+    DEFAULT_FROST_PROTECTION_TEMP,
+    DEFAULT_SENSOR_TIMEOUT_MIN,
+    DEFAULT_HUMIDITY_REF,
+    DEFAULT_HUMIDITY_FACTOR,
+    DEFAULT_ENERGY_PRICE_THRESHOLD,
+    DEFAULT_ENERGY_PRICE_SETBACK,
+    DEFAULT_AUTO_MODE_COOL_THRESHOLD,
+    DEFAULT_AUTO_MODE_HEAT_THRESHOLD,
     DEFAULT_PUMP_EXERCISE_TIME,
     DEFAULT_PUMP_MIN_RUN_TIME,
     DEFAULT_PUMP_POST_HEAT_DELAY,
@@ -256,6 +277,47 @@ STEP_ADVANCED_SCHEMA = vol.Schema(
         vol.Optional(CONF_NOTIFY_ON_DELAY, default=False): selector.BooleanSelector(),
         vol.Optional(CONF_NOTIFY_DELAY_MIN, default=DEFAULT_NOTIFY_DELAY_MIN): selector.NumberSelector(
             selector.NumberSelectorConfig(min=15, max=240, step=15, mode="box")
+        ),
+        vol.Optional(CONF_NOTIFY_SERVICE): str,
+        # Vorstbeveiliging
+        vol.Optional(CONF_FROST_PROTECTION_TEMP): selector.NumberSelector(
+            selector.NumberSelectorConfig(min=0.0, max=15.0, step=0.5, mode="box")
+        ),
+        # Sensorfailsafe
+        vol.Optional(CONF_SENSOR_TIMEOUT_MIN): selector.NumberSelector(
+            selector.NumberSelectorConfig(min=5, max=120, step=5, mode="box")
+        ),
+        # Vochtcomfortcorrectie
+        vol.Optional(CONF_HUMIDITY_SENSOR): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="sensor")
+        ),
+        vol.Optional(CONF_HUMIDITY_REF, default=DEFAULT_HUMIDITY_REF): selector.NumberSelector(
+            selector.NumberSelectorConfig(min=30.0, max=80.0, step=5.0, mode="box")
+        ),
+        vol.Optional(CONF_HUMIDITY_FACTOR, default=DEFAULT_HUMIDITY_FACTOR): selector.NumberSelector(
+            selector.NumberSelectorConfig(min=0.0, max=0.5, step=0.01, mode="box")
+        ),
+        # Prijsgestuurde setback
+        vol.Optional(CONF_ENERGY_PRICE_SENSOR): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="sensor")
+        ),
+        vol.Optional(CONF_ENERGY_PRICE_THRESHOLD, default=DEFAULT_ENERGY_PRICE_THRESHOLD): selector.NumberSelector(
+            selector.NumberSelectorConfig(min=0.05, max=1.0, step=0.05, mode="box")
+        ),
+        vol.Optional(CONF_ENERGY_PRICE_SETBACK, default=DEFAULT_ENERGY_PRICE_SETBACK): selector.NumberSelector(
+            selector.NumberSelectorConfig(min=0.5, max=5.0, step=0.5, mode="box")
+        ),
+        # Seizoensdetectie
+        vol.Optional(CONF_AUTO_MODE, default=False): selector.BooleanSelector(),
+        vol.Optional(CONF_AUTO_MODE_COOL_THRESHOLD, default=DEFAULT_AUTO_MODE_COOL_THRESHOLD): selector.NumberSelector(
+            selector.NumberSelectorConfig(min=15.0, max=35.0, step=1.0, mode="box")
+        ),
+        vol.Optional(CONF_AUTO_MODE_HEAT_THRESHOLD, default=DEFAULT_AUTO_MODE_HEAT_THRESHOLD): selector.NumberSelector(
+            selector.NumberSelectorConfig(min=10.0, max=30.0, step=1.0, mode="box")
+        ),
+        # HA Calendar koppeling
+        vol.Optional(CONF_VACATION_CALENDAR): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="calendar")
         ),
     }
 )
@@ -608,6 +670,65 @@ class SmartClimateOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional(CONF_NOTIFY_ON_DELAY, default=cur.get(CONF_NOTIFY_ON_DELAY, False)): selector.BooleanSelector(),
                 vol.Optional(CONF_NOTIFY_DELAY_MIN, default=cur.get(CONF_NOTIFY_DELAY_MIN, DEFAULT_NOTIFY_DELAY_MIN)): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=15, max=240, step=15, mode="box")
+                ),
+                vol.Optional(CONF_NOTIFY_SERVICE, default=cur.get(CONF_NOTIFY_SERVICE, "")): str,
+                # Vorstbeveiliging
+                vol.Optional(CONF_FROST_PROTECTION_TEMP, default=cur.get(CONF_FROST_PROTECTION_TEMP, DEFAULT_FROST_PROTECTION_TEMP)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.0, max=15.0, step=0.5, mode="box")
+                ),
+                # Sensorfailsafe
+                vol.Optional(CONF_SENSOR_TIMEOUT_MIN, default=cur.get(CONF_SENSOR_TIMEOUT_MIN, DEFAULT_SENSOR_TIMEOUT_MIN)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=5, max=120, step=5, mode="box")
+                ),
+                # Vochtcomfortcorrectie
+                **(
+                    {vol.Optional(CONF_HUMIDITY_SENSOR, default=cur[CONF_HUMIDITY_SENSOR]): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain="sensor")
+                    )}
+                    if cur.get(CONF_HUMIDITY_SENSOR)
+                    else {vol.Optional(CONF_HUMIDITY_SENSOR): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain="sensor")
+                    )}
+                ),
+                vol.Optional(CONF_HUMIDITY_REF, default=cur.get(CONF_HUMIDITY_REF, DEFAULT_HUMIDITY_REF)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=30.0, max=80.0, step=5.0, mode="box")
+                ),
+                vol.Optional(CONF_HUMIDITY_FACTOR, default=cur.get(CONF_HUMIDITY_FACTOR, DEFAULT_HUMIDITY_FACTOR)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.0, max=0.5, step=0.01, mode="box")
+                ),
+                # Prijsgestuurde setback
+                **(
+                    {vol.Optional(CONF_ENERGY_PRICE_SENSOR, default=cur[CONF_ENERGY_PRICE_SENSOR]): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain="sensor")
+                    )}
+                    if cur.get(CONF_ENERGY_PRICE_SENSOR)
+                    else {vol.Optional(CONF_ENERGY_PRICE_SENSOR): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain="sensor")
+                    )}
+                ),
+                vol.Optional(CONF_ENERGY_PRICE_THRESHOLD, default=cur.get(CONF_ENERGY_PRICE_THRESHOLD, DEFAULT_ENERGY_PRICE_THRESHOLD)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.05, max=1.0, step=0.05, mode="box")
+                ),
+                vol.Optional(CONF_ENERGY_PRICE_SETBACK, default=cur.get(CONF_ENERGY_PRICE_SETBACK, DEFAULT_ENERGY_PRICE_SETBACK)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.5, max=5.0, step=0.5, mode="box")
+                ),
+                # Seizoensdetectie
+                vol.Optional(CONF_AUTO_MODE, default=cur.get(CONF_AUTO_MODE, False)): selector.BooleanSelector(),
+                vol.Optional(CONF_AUTO_MODE_COOL_THRESHOLD, default=cur.get(CONF_AUTO_MODE_COOL_THRESHOLD, DEFAULT_AUTO_MODE_COOL_THRESHOLD)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=15.0, max=35.0, step=1.0, mode="box")
+                ),
+                vol.Optional(CONF_AUTO_MODE_HEAT_THRESHOLD, default=cur.get(CONF_AUTO_MODE_HEAT_THRESHOLD, DEFAULT_AUTO_MODE_HEAT_THRESHOLD)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=10.0, max=30.0, step=1.0, mode="box")
+                ),
+                # HA Calendar koppeling
+                **(
+                    {vol.Optional(CONF_VACATION_CALENDAR, default=cur[CONF_VACATION_CALENDAR]): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain="calendar")
+                    )}
+                    if cur.get(CONF_VACATION_CALENDAR)
+                    else {vol.Optional(CONF_VACATION_CALENDAR): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain="calendar")
+                    )}
                 ),
             }
         )
