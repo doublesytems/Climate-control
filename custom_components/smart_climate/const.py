@@ -49,6 +49,7 @@ CONF_PRESENCE_SENSORS = "presence_sensors"
 
 # Window detection
 CONF_WINDOW_DETECTION = "window_detection"
+CONF_WINDOW_SENSOR = "window_sensor"           # binary_sensor entiteit (directe raamdetekie)
 CONF_WINDOW_TEMP_DROP = "window_temp_drop"
 CONF_WINDOW_TEMP_DROP_TIME = "window_temp_drop_time"
 CONF_WINDOW_OPEN_DURATION = "window_open_duration"
@@ -76,6 +77,19 @@ CONF_CASCADE_PRIMARY_COOLER = "cascade_primary_cooler"
 CONF_CASCADE_TIMEOUT = "cascade_timeout_min"
 CONF_CASCADE_TEMP_THRESHOLD = "cascade_temp_threshold"
 CONF_CASCADE_DEACTIVATE_DELAY = "cascade_deactivate_delay_min"
+CONF_CASCADE_INSTANT_THRESHOLD = "cascade_instant_threshold"  # °C tekort → meteen secundaire
+
+# Koeling blokkeren bij lage buitentemperatuur
+CONF_COOL_BLOCK_OUTSIDE_TEMP = "cool_block_outside_temp"
+
+# Geleidelijke preset-overgang (ramp)
+CONF_TEMP_RAMP = "temp_ramp_enabled"
+CONF_TEMP_RAMP_STEP = "temp_ramp_step"          # °C per stap
+CONF_TEMP_RAMP_INTERVAL = "temp_ramp_interval"  # minuten per stap
+
+# Persistent notification bij vertraging
+CONF_NOTIFY_ON_DELAY = "notify_on_delay"
+CONF_NOTIFY_DELAY_MIN = "notify_delay_min"
 
 # Pump
 CONF_PUMP_ENTITY = "pump_entity"
@@ -132,6 +146,11 @@ DEFAULT_BOOST_DURATION = 60  # minutes
 DEFAULT_WINDOW_TEMP_DROP = 1.5   # °C
 DEFAULT_WINDOW_TEMP_DROP_TIME = 5  # minutes
 DEFAULT_WINDOW_OPEN_DURATION = 20  # minutes
+DEFAULT_COOL_BLOCK_OUTSIDE_TEMP = 16.0   # °C — koel niet als buiten al koud
+DEFAULT_CASCADE_INSTANT_THRESHOLD = 3.0  # °C tekort → meteen secundaire inschakelen
+DEFAULT_TEMP_RAMP_STEP = 0.5             # °C per ramp-stap
+DEFAULT_TEMP_RAMP_INTERVAL = 5           # minuten per ramp-stap
+DEFAULT_NOTIFY_DELAY_MIN = 60            # minuten wachten voor notificatie
 
 DEFAULT_WEATHER_SLOPE = 0.5
 DEFAULT_WEATHER_OUTSIDE_REF = 15.0
@@ -148,6 +167,9 @@ DEFAULT_EARLY_START = True
 DEFAULT_CASCADE_TIMEOUT = 30          # minuten wachten voor secundair inschakelt
 DEFAULT_CASCADE_TEMP_THRESHOLD = 1.5  # °C tekort t.o.v. doel om secundair te activeren
 DEFAULT_CASCADE_DEACTIVATE_DELAY = 10 # minuten secundair nog aan na bereiken doel
+
+# Notification
+NOTIFICATION_ID_PREFIX = "smart_climate_delay_"
 
 # Pump
 DEFAULT_PUMP_ANTI_SEIZE_INTERVAL = 24   # hours

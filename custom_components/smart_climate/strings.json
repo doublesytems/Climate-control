@@ -55,7 +55,8 @@
           "cascade_primary_cooler": "Primaire koelentiteit (bijv. airco)",
           "cascade_timeout_min": "Wachttijd voor secundaire bron (minuten)",
           "cascade_temp_threshold": "Temperatuurtekort om secundaire te activeren (°C)",
-          "cascade_deactivate_delay_min": "Uitschakelvertraging secundaire bron (minuten)"
+          "cascade_deactivate_delay_min": "Uitschakelvertraging secundaire bron (minuten)",
+          "cascade_instant_threshold": "Onmiddellijke drempel (°C tekort → meteen secundaire)"
         }
       },
       "pump": {
@@ -77,16 +78,23 @@
         "title": "Geavanceerde opties",
         "data": {
           "presence_sensors": "Aanwezigheidssensoren (personen / device trackers)",
+          "window_sensor": "Raamsensor (binary_sensor — directe detectie)",
           "window_detection": "Raamdeetctie inschakelen",
           "window_temp_drop": "Temperatuurdaling voor raamalarm (°C)",
           "window_temp_drop_time": "Tijdsvenster voor raamdaling (minuten)",
           "window_open_duration": "Pauzetijd na raampdetectie (minuten)",
+          "cool_block_outside_temp": "Koeling blokkeren als buiten ≤ (°C)",
           "weather_compensation": "Weerscompensatie inschakelen",
           "weather_slope": "Weerscompensatie helling (°C/°C)",
           "weather_outside_ref": "Referentie buitentemperatuur (°C)",
           "heater_watt": "Vermogen verwarming (Watt)",
           "cooler_watt": "Vermogen koeling (Watt)",
-          "ac_idle_mode": "AC ruststand bij doel bereikt"
+          "ac_idle_mode": "AC ruststand bij doel bereikt",
+          "temp_ramp_enabled": "Geleidelijke temperatuurovergang inschakelen",
+          "temp_ramp_step": "Stapgrootte (°C per stap)",
+          "temp_ramp_interval": "Stapinterval (minuten)",
+          "notify_on_delay": "Notificatie als doel niet bereikt",
+          "notify_delay_min": "Wachttijd voor notificatie (minuten)"
         }
       }
     },
@@ -127,15 +135,49 @@
         "title": "Aanwezigheid, raam, weer en energie",
         "data": {
           "presence_sensors": "Aanwezigheidssensoren",
+          "window_sensor": "Raamsensor (binary_sensor)",
           "window_detection": "Raamdectie",
           "window_temp_drop": "Drempel temperatuurdaling (°C)",
           "window_temp_drop_time": "Tijdsvenster (min)",
           "window_open_duration": "Pauzetijd (min)",
+          "cool_block_outside_temp": "Koeling blokkeren onder (°C)",
           "weather_compensation": "Weerscompensatie",
           "weather_slope": "Helling",
           "weather_outside_ref": "Referentie buitentemperatuur (°C)",
           "heater_watt": "Verwarmingsvermogen (W)",
-          "cooler_watt": "Koelingsvermogen (W)"
+          "cooler_watt": "Koelingsvermogen (W)",
+          "ac_idle_mode": "AC ruststand",
+          "temp_ramp_enabled": "Geleidelijke overgang",
+          "temp_ramp_step": "Stapgrootte (°C)",
+          "temp_ramp_interval": "Stapinterval (min)",
+          "notify_on_delay": "Notificatie bij vertraging",
+          "notify_delay_min": "Wachttijd notificatie (min)"
+        }
+      },
+      "cascade_opt": {
+        "title": "Cascade regeling",
+        "data": {
+          "cascade_enabled": "Cascade inschakelen",
+          "cascade_primary_heater": "Primaire verwarmingsentiteit",
+          "cascade_primary_cooler": "Primaire koelentiteit",
+          "cascade_timeout_min": "Wachttijd secundaire (min)",
+          "cascade_temp_threshold": "Drempel temperatuurtekort (°C)",
+          "cascade_deactivate_delay_min": "Uitschakelvertraging secundaire (min)",
+          "cascade_instant_threshold": "Onmiddellijke drempel (°C)"
+        }
+      },
+      "pump_opt": {
+        "title": "Vloerverwarming pomp",
+        "data": {
+          "pump_entity": "Pomp relais entiteit",
+          "pump_zone_entities": "Zone-entiteiten",
+          "pump_anti_seize_interval_h": "Anti-vastloop interval (uren)",
+          "pump_anti_seize_duration_min": "Anti-vastloop duur (min)",
+          "pump_post_heat_delay_min": "Na-looptijd (min)",
+          "pump_min_run_time_sec": "Minimale looptijd (s)",
+          "pump_exercise_time": "Voorkeurstijd (HH:MM)",
+          "learning_enabled": "Zelflerend algoritme",
+          "early_start": "Vroeg starten"
         }
       }
     }

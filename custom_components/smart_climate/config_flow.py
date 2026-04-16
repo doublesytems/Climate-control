@@ -18,6 +18,14 @@ from .const import (
     CONF_AC_IDLE_MODE,
     CONF_AC_MODE,
     CONF_ALGORITHM,
+    CONF_CASCADE_INSTANT_THRESHOLD,
+    CONF_COOL_BLOCK_OUTSIDE_TEMP,
+    CONF_NOTIFY_ON_DELAY,
+    CONF_NOTIFY_DELAY_MIN,
+    CONF_TEMP_RAMP,
+    CONF_TEMP_RAMP_STEP,
+    CONF_TEMP_RAMP_INTERVAL,
+    CONF_WINDOW_SENSOR,
     CONF_BOOST_DURATION,
     CONF_COLD_TOLERANCE,
     CONF_COOLER,
@@ -79,7 +87,12 @@ from .const import (
     DEFAULT_CASCADE_DEACTIVATE_DELAY,
     DEFAULT_CASCADE_TEMP_THRESHOLD,
     DEFAULT_AC_IDLE_MODE,
+    DEFAULT_CASCADE_INSTANT_THRESHOLD,
     DEFAULT_CASCADE_TIMEOUT,
+    DEFAULT_COOL_BLOCK_OUTSIDE_TEMP,
+    DEFAULT_NOTIFY_DELAY_MIN,
+    DEFAULT_TEMP_RAMP_STEP,
+    DEFAULT_TEMP_RAMP_INTERVAL,
     DEFAULT_PUMP_EXERCISE_TIME,
     DEFAULT_PUMP_MIN_RUN_TIME,
     DEFAULT_PUMP_POST_HEAT_DELAY,
@@ -192,6 +205,9 @@ STEP_ADVANCED_SCHEMA = vol.Schema(
             )
         ),
         # Window detection
+        vol.Optional(CONF_WINDOW_SENSOR): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=["binary_sensor", "input_boolean"])
+        ),
         vol.Optional(CONF_WINDOW_DETECTION, default=False): selector.BooleanSelector(),
         vol.Optional(CONF_WINDOW_TEMP_DROP, default=DEFAULT_WINDOW_TEMP_DROP): selector.NumberSelector(
             selector.NumberSelectorConfig(min=0.5, max=5.0, step=0.1, mode="box")
@@ -201,6 +217,10 @@ STEP_ADVANCED_SCHEMA = vol.Schema(
         ),
         vol.Optional(CONF_WINDOW_OPEN_DURATION, default=DEFAULT_WINDOW_OPEN_DURATION): selector.NumberSelector(
             selector.NumberSelectorConfig(min=1, max=120, step=1, mode="box")
+        ),
+        # Koeling blokkeren bij lage buitentemperatuur
+        vol.Optional(CONF_COOL_BLOCK_OUTSIDE_TEMP): selector.NumberSelector(
+            selector.NumberSelectorConfig(min=5.0, max=25.0, step=0.5, mode="box")
         ),
         # Weather compensation
         vol.Optional(CONF_WEATHER_COMPENSATION, default=False): selector.BooleanSelector(),
@@ -223,6 +243,19 @@ STEP_ADVANCED_SCHEMA = vol.Schema(
                 options=["off", "fan_only"],
                 translation_key="ac_idle_mode",
             )
+        ),
+        # Temperatuur ramp
+        vol.Optional(CONF_TEMP_RAMP, default=False): selector.BooleanSelector(),
+        vol.Optional(CONF_TEMP_RAMP_STEP, default=DEFAULT_TEMP_RAMP_STEP): selector.NumberSelector(
+            selector.NumberSelectorConfig(min=0.1, max=2.0, step=0.1, mode="box")
+        ),
+        vol.Optional(CONF_TEMP_RAMP_INTERVAL, default=DEFAULT_TEMP_RAMP_INTERVAL): selector.NumberSelector(
+            selector.NumberSelectorConfig(min=1, max=30, step=1, mode="box")
+        ),
+        # Notificatie bij vertraging
+        vol.Optional(CONF_NOTIFY_ON_DELAY, default=False): selector.BooleanSelector(),
+        vol.Optional(CONF_NOTIFY_DELAY_MIN, default=DEFAULT_NOTIFY_DELAY_MIN): selector.NumberSelector(
+            selector.NumberSelectorConfig(min=15, max=240, step=15, mode="box")
         ),
     }
 )
@@ -318,6 +351,9 @@ class SmartClimateConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ),
                 vol.Optional(CONF_CASCADE_DEACTIVATE_DELAY, default=DEFAULT_CASCADE_DEACTIVATE_DELAY): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=0, max=60, step=5, mode="box")
+                ),
+                vol.Optional(CONF_CASCADE_INSTANT_THRESHOLD, default=DEFAULT_CASCADE_INSTANT_THRESHOLD): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=1.0, max=10.0, step=0.5, mode="box")
                 ),
             }
         )
@@ -456,7 +492,7 @@ class SmartClimateOptionsFlow(config_entries.OptionsFlow):
         cur = {**self.config_entry.data, **self.config_entry.options}
         if user_input is not None:
             self._data.update(user_input)
-            return self.async_create_entry(title="", data=self._data)
+            return await self.async_step_cascade_opt()
 
         schema = vol.Schema(
             {
@@ -465,6 +501,15 @@ class SmartClimateOptionsFlow(config_entries.OptionsFlow):
                         domain=["person", "device_tracker", "binary_sensor", "input_boolean"],
                         multiple=True,
                     )
+                ),
+                **(
+                    {vol.Optional(CONF_WINDOW_SENSOR, default=cur[CONF_WINDOW_SENSOR]): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain=["binary_sensor", "input_boolean"])
+                    )}
+                    if cur.get(CONF_WINDOW_SENSOR)
+                    else {vol.Optional(CONF_WINDOW_SENSOR): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain=["binary_sensor", "input_boolean"])
+                    )}
                 ),
                 vol.Optional(CONF_WINDOW_DETECTION, default=cur.get(CONF_WINDOW_DETECTION, False)): selector.BooleanSelector(),
                 vol.Optional(CONF_WINDOW_TEMP_DROP, default=cur.get(CONF_WINDOW_TEMP_DROP, DEFAULT_WINDOW_TEMP_DROP)): selector.NumberSelector(
@@ -475,6 +520,9 @@ class SmartClimateOptionsFlow(config_entries.OptionsFlow):
                 ),
                 vol.Optional(CONF_WINDOW_OPEN_DURATION, default=cur.get(CONF_WINDOW_OPEN_DURATION, DEFAULT_WINDOW_OPEN_DURATION)): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=1, max=120, step=1, mode="box")
+                ),
+                vol.Optional(CONF_COOL_BLOCK_OUTSIDE_TEMP, default=cur.get(CONF_COOL_BLOCK_OUTSIDE_TEMP, DEFAULT_COOL_BLOCK_OUTSIDE_TEMP)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=5.0, max=25.0, step=0.5, mode="box")
                 ),
                 vol.Optional(CONF_WEATHER_COMPENSATION, default=cur.get(CONF_WEATHER_COMPENSATION, False)): selector.BooleanSelector(),
                 vol.Optional(CONF_WEATHER_SLOPE, default=cur.get(CONF_WEATHER_SLOPE, DEFAULT_WEATHER_SLOPE)): selector.NumberSelector(
@@ -489,6 +537,111 @@ class SmartClimateOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional(CONF_COOLER_WATT, default=cur.get(CONF_COOLER_WATT, 0)): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=0, max=10000, step=50, mode="box")
                 ),
+                vol.Optional(CONF_AC_IDLE_MODE, default=cur.get(CONF_AC_IDLE_MODE, DEFAULT_AC_IDLE_MODE)): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=["off", "fan_only"], translation_key="ac_idle_mode")
+                ),
+                vol.Optional(CONF_TEMP_RAMP, default=cur.get(CONF_TEMP_RAMP, False)): selector.BooleanSelector(),
+                vol.Optional(CONF_TEMP_RAMP_STEP, default=cur.get(CONF_TEMP_RAMP_STEP, DEFAULT_TEMP_RAMP_STEP)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.1, max=2.0, step=0.1, mode="box")
+                ),
+                vol.Optional(CONF_TEMP_RAMP_INTERVAL, default=cur.get(CONF_TEMP_RAMP_INTERVAL, DEFAULT_TEMP_RAMP_INTERVAL)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=1, max=30, step=1, mode="box")
+                ),
+                vol.Optional(CONF_NOTIFY_ON_DELAY, default=cur.get(CONF_NOTIFY_ON_DELAY, False)): selector.BooleanSelector(),
+                vol.Optional(CONF_NOTIFY_DELAY_MIN, default=cur.get(CONF_NOTIFY_DELAY_MIN, DEFAULT_NOTIFY_DELAY_MIN)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=15, max=240, step=15, mode="box")
+                ),
             }
         )
         return self.async_show_form(step_id="advanced_opt", data_schema=schema)
+
+    async def async_step_cascade_opt(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Step 4 — cascade instellingen."""
+        cur = {**self.config_entry.data, **self.config_entry.options}
+        if user_input is not None:
+            self._data.update(user_input)
+            return await self.async_step_pump_opt()
+
+        schema = vol.Schema(
+            {
+                vol.Optional(CONF_CASCADE_ENABLED, default=cur.get(CONF_CASCADE_ENABLED, False)): selector.BooleanSelector(),
+                **(
+                    {vol.Optional(CONF_CASCADE_PRIMARY_HEATER, default=cur[CONF_CASCADE_PRIMARY_HEATER]): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain=["climate", "switch", "input_boolean"])
+                    )}
+                    if cur.get(CONF_CASCADE_PRIMARY_HEATER)
+                    else {vol.Optional(CONF_CASCADE_PRIMARY_HEATER): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain=["climate", "switch", "input_boolean"])
+                    )}
+                ),
+                **(
+                    {vol.Optional(CONF_CASCADE_PRIMARY_COOLER, default=cur[CONF_CASCADE_PRIMARY_COOLER]): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain=["climate", "switch", "input_boolean"])
+                    )}
+                    if cur.get(CONF_CASCADE_PRIMARY_COOLER)
+                    else {vol.Optional(CONF_CASCADE_PRIMARY_COOLER): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain=["climate", "switch", "input_boolean"])
+                    )}
+                ),
+                vol.Optional(CONF_CASCADE_TIMEOUT, default=cur.get(CONF_CASCADE_TIMEOUT, DEFAULT_CASCADE_TIMEOUT)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=5, max=120, step=5, mode="box")
+                ),
+                vol.Optional(CONF_CASCADE_TEMP_THRESHOLD, default=cur.get(CONF_CASCADE_TEMP_THRESHOLD, DEFAULT_CASCADE_TEMP_THRESHOLD)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.5, max=5.0, step=0.5, mode="box")
+                ),
+                vol.Optional(CONF_CASCADE_DEACTIVATE_DELAY, default=cur.get(CONF_CASCADE_DEACTIVATE_DELAY, DEFAULT_CASCADE_DEACTIVATE_DELAY)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0, max=60, step=5, mode="box")
+                ),
+                vol.Optional(CONF_CASCADE_INSTANT_THRESHOLD, default=cur.get(CONF_CASCADE_INSTANT_THRESHOLD, DEFAULT_CASCADE_INSTANT_THRESHOLD)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=1.0, max=10.0, step=0.5, mode="box")
+                ),
+            }
+        )
+        return self.async_show_form(step_id="cascade_opt", data_schema=schema)
+
+    async def async_step_pump_opt(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Step 5 — pomp instellingen."""
+        cur = {**self.config_entry.data, **self.config_entry.options}
+        if user_input is not None:
+            self._data.update(user_input)
+            return self.async_create_entry(title="", data=self._data)
+
+        schema = vol.Schema(
+            {
+                **(
+                    {vol.Optional(CONF_PUMP_ENTITY, default=cur[CONF_PUMP_ENTITY]): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain=["switch", "input_boolean"])
+                    )}
+                    if cur.get(CONF_PUMP_ENTITY)
+                    else {vol.Optional(CONF_PUMP_ENTITY): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain=["switch", "input_boolean"])
+                    )}
+                ),
+                vol.Optional(CONF_PUMP_ZONE_ENTITIES, default=cur.get(CONF_PUMP_ZONE_ENTITIES, [])): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain=["switch", "climate", "input_boolean"],
+                        multiple=True,
+                    )
+                ),
+                vol.Optional(CONF_PUMP_ANTI_SEIZE_INTERVAL, default=cur.get(CONF_PUMP_ANTI_SEIZE_INTERVAL, DEFAULT_PUMP_ANTI_SEIZE_INTERVAL)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=1, max=168, step=1, mode="box")
+                ),
+                vol.Optional(CONF_PUMP_ANTI_SEIZE_DURATION, default=cur.get(CONF_PUMP_ANTI_SEIZE_DURATION, DEFAULT_PUMP_ANTI_SEIZE_DURATION)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=5, max=120, step=5, mode="box")
+                ),
+                vol.Optional(CONF_PUMP_POST_HEAT_DELAY, default=cur.get(CONF_PUMP_POST_HEAT_DELAY, DEFAULT_PUMP_POST_HEAT_DELAY)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0, max=60, step=1, mode="box")
+                ),
+                vol.Optional(CONF_PUMP_MIN_RUN_TIME, default=cur.get(CONF_PUMP_MIN_RUN_TIME, DEFAULT_PUMP_MIN_RUN_TIME)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0, max=600, step=10, mode="box")
+                ),
+                vol.Optional(CONF_PUMP_EXERCISE_TIME, default=cur.get(CONF_PUMP_EXERCISE_TIME, DEFAULT_PUMP_EXERCISE_TIME)): selector.TimeSelector(),
+                vol.Optional(CONF_LEARNING_ENABLED, default=cur.get(CONF_LEARNING_ENABLED, True)): selector.BooleanSelector(),
+                vol.Optional(CONF_EARLY_START, default=cur.get(CONF_EARLY_START, True)): selector.BooleanSelector(),
+            }
+        )
+        return self.async_show_form(step_id="pump_opt", data_schema=schema)

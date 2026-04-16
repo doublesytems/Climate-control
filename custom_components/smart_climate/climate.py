@@ -122,7 +122,15 @@ from .const import (
     CONF_CASCADE_TIMEOUT,
     CONF_EARLY_START,
     CONF_LEARNING_ENABLED,
+    CONF_COOL_BLOCK_OUTSIDE_TEMP,
+    CONF_CASCADE_INSTANT_THRESHOLD,
+    CONF_NOTIFY_ON_DELAY,
+    CONF_NOTIFY_DELAY_MIN,
+    CONF_TEMP_RAMP,
+    CONF_TEMP_RAMP_STEP,
+    CONF_TEMP_RAMP_INTERVAL,
     CONF_WINDOW_DETECTION,
+    CONF_WINDOW_SENSOR,
     CONF_WINDOW_OPEN_DURATION,
     CONF_WINDOW_TEMP_DROP,
     CONF_WINDOW_TEMP_DROP_TIME,
@@ -145,8 +153,14 @@ from .const import (
     DEFAULT_WINDOW_TEMP_DROP,
     DEFAULT_AC_IDLE_MODE,
     DEFAULT_CASCADE_DEACTIVATE_DELAY,
+    DEFAULT_CASCADE_INSTANT_THRESHOLD,
     DEFAULT_CASCADE_TEMP_THRESHOLD,
     DEFAULT_CASCADE_TIMEOUT,
+    DEFAULT_COOL_BLOCK_OUTSIDE_TEMP,
+    DEFAULT_NOTIFY_DELAY_MIN,
+    DEFAULT_TEMP_RAMP_STEP,
+    DEFAULT_TEMP_RAMP_INTERVAL,
+    NOTIFICATION_ID_PREFIX,
     DEFAULT_WINDOW_TEMP_DROP_TIME,
     DOMAIN,
     EMA_ALPHA,
@@ -224,7 +238,15 @@ async def async_setup_entry(
         cascade_timeout_min=int(d.get(CONF_CASCADE_TIMEOUT, DEFAULT_CASCADE_TIMEOUT)),
         cascade_temp_threshold=float(d.get(CONF_CASCADE_TEMP_THRESHOLD, DEFAULT_CASCADE_TEMP_THRESHOLD)),
         cascade_deactivate_delay_min=int(d.get(CONF_CASCADE_DEACTIVATE_DELAY, DEFAULT_CASCADE_DEACTIVATE_DELAY)),
+        cascade_instant_threshold=float(d[CONF_CASCADE_INSTANT_THRESHOLD]) if d.get(CONF_CASCADE_INSTANT_THRESHOLD) is not None else None,
         ac_idle_mode=d.get(CONF_AC_IDLE_MODE, DEFAULT_AC_IDLE_MODE),
+        window_sensor=d.get(CONF_WINDOW_SENSOR),
+        cool_block_outside_temp=float(d[CONF_COOL_BLOCK_OUTSIDE_TEMP]) if d.get(CONF_COOL_BLOCK_OUTSIDE_TEMP) is not None else None,
+        temp_ramp=bool(d.get(CONF_TEMP_RAMP, False)),
+        temp_ramp_step=float(d.get(CONF_TEMP_RAMP_STEP, DEFAULT_TEMP_RAMP_STEP)),
+        temp_ramp_interval=int(d.get(CONF_TEMP_RAMP_INTERVAL, DEFAULT_TEMP_RAMP_INTERVAL)),
+        notify_on_delay=bool(d.get(CONF_NOTIFY_ON_DELAY, False)),
+        notify_delay_min=int(d.get(CONF_NOTIFY_DELAY_MIN, DEFAULT_NOTIFY_DELAY_MIN)),
     )
 
     # Load persistent storage (learned rates etc.)
@@ -399,7 +421,15 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         cascade_timeout_min: int,
         cascade_temp_threshold: float,
         cascade_deactivate_delay_min: int,
+        cascade_instant_threshold: float | None = None,
         ac_idle_mode: str = AC_IDLE_OFF,
+        window_sensor: str | None = None,
+        cool_block_outside_temp: float | None = None,
+        temp_ramp: bool = False,
+        temp_ramp_step: float = DEFAULT_TEMP_RAMP_STEP,
+        temp_ramp_interval: int = DEFAULT_TEMP_RAMP_INTERVAL,
+        notify_on_delay: bool = False,
+        notify_delay_min: int = DEFAULT_NOTIFY_DELAY_MIN,
     ) -> None:
         self.hass = hass
         self._config_entry = config_entry
@@ -516,6 +546,7 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         self._cascade_timeout_min = cascade_timeout_min
         self._cascade_temp_threshold = cascade_temp_threshold
         self._cascade_deactivate_delay_min = cascade_deactivate_delay_min
+        self._cascade_instant_threshold = cascade_instant_threshold
         self._ac_idle_mode = ac_idle_mode
 
         self._cascade_primary_heat_on: bool = False
@@ -524,6 +555,25 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         self._cascade_secondary_active: bool = False
         self._cascade_secondary_start_time: datetime | None = None
         self._cascade_reason: str = ""
+
+        # Window sensor (binary_sensor — directe detectie, hogere prioriteit dan temp-val)
+        self._window_sensor = window_sensor
+
+        # Koeling blokkeren bij lage buitentemperatuur
+        self._cool_block_outside_temp = cool_block_outside_temp
+
+        # Geleidelijke preset-overgang (ramp)
+        self._temp_ramp = temp_ramp
+        self._temp_ramp_step = temp_ramp_step
+        self._temp_ramp_interval = temp_ramp_interval
+        self._ramp_target: float | None = None
+        self._ramp_cancel: Any = None  # callable returned by async_track_time_interval
+
+        # Persistent notification bij vertraging
+        self._notify_on_delay = notify_on_delay
+        self._notify_delay_min = notify_delay_min
+        self._heat_cool_start_time: datetime | None = None
+        self._notify_sent: bool = False
 
         # Self-learning
         self._learning_enabled = learning_enabled
@@ -663,6 +713,14 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                 )
             )
 
+        # Track window sensor (binary_sensor)
+        if self._window_sensor:
+            self.async_on_remove(
+                async_track_state_change_event(
+                    self.hass, [self._window_sensor], self._async_window_sensor_changed
+                )
+            )
+
         # Keep-alive interval
         if self._keep_alive:
             self.async_on_remove(
@@ -797,9 +855,13 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         temp = kwargs.get(ATTR_TEMPERATURE)
         if temp is None:
             return
-        self._attr_target_temperature = temp
         self._attr_preset_mode = PRESET_NONE
         self._pid.reset()
+        current = self._attr_target_temperature or temp
+        if self._temp_ramp and abs(temp - current) > self._temp_ramp_step:
+            await self._async_start_ramp(temp)
+        else:
+            self._attr_target_temperature = temp
         # Stuur nieuwe doeltemperatuur direct door naar actieve climate-entiteiten
         if self._heater_on and self._heater_entity_id:
             await self._async_update_primary_temperature(self._heater_entity_id)
@@ -820,17 +882,24 @@ class SmartClimate(ClimateEntity, RestoreEntity):
             )
             return
 
+        new_temp: float | None = None
         if preset_mode == PRESET_SCHEDULE:
             active = self._schedule.get_active_preset()
             if active and active in self._preset_temps:
-                self._attr_target_temperature = self._preset_temps[active]
+                new_temp = self._preset_temps[active]
         elif preset_mode != PRESET_NONE:
-            self._attr_target_temperature = self._preset_temps.get(
-                preset_mode, self._attr_target_temperature
-            )
+            new_temp = self._preset_temps.get(preset_mode)
 
         self._boost_end = None
         self._pid.reset()
+
+        if new_temp is not None:
+            current = self._attr_target_temperature or new_temp
+            if self._temp_ramp and abs(new_temp - current) > self._temp_ramp_step:
+                await self._async_start_ramp(new_temp)
+            else:
+                self._attr_target_temperature = new_temp
+
         await self._async_control_heating()
         self.async_write_ha_state()
 
@@ -1022,6 +1091,9 @@ class SmartClimate(ClimateEntity, RestoreEntity):
 
     def _check_window_open(self) -> None:
         """Detect rapid temperature drop indicating an open window."""
+        # Skip temperature-drop detection if a binary_sensor handles this directly
+        if self._window_sensor:
+            return
         if len(self._temp_history) < 2:
             return
 
@@ -1048,6 +1120,72 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         """Turn off heating/cooling while window is open."""
         if self._window_open:
             await self._async_turn_off_all()
+
+    @callback
+    def _async_window_sensor_changed(self, event) -> None:
+        """Handle state change of the window binary_sensor."""
+        new_state = event.data.get("new_state")
+        if new_state is None or new_state.state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
+            return
+        is_open = new_state.state == STATE_ON
+        if is_open and not self._window_open:
+            self._window_open = True
+            self._window_open_since = dt_util.utcnow()
+            _LOGGER.info("[%s] Window OPEN (sensor)", self.name)
+            self.hass.async_create_task(self._async_window_suspend())
+        elif not is_open and self._window_open:
+            self._window_open = False
+            self._window_open_since = None
+            _LOGGER.info("[%s] Window CLOSED (sensor) — resumed control", self.name)
+            self.hass.async_create_task(self._async_control_heating())
+        self.async_write_ha_state()
+
+    # ------------------------------------------------------------------
+    # Temperature ramp (Feature 5)
+    # ------------------------------------------------------------------
+
+    def _async_cancel_ramp(self) -> None:
+        """Annuleer een lopende ramp."""
+        if self._ramp_cancel is not None:
+            self._ramp_cancel()
+            self._ramp_cancel = None
+        self._ramp_target = None
+
+    async def _async_start_ramp(self, final_target: float) -> None:
+        """Start geleidelijke overgang naar final_target met stappen van ramp_step."""
+        self._async_cancel_ramp()
+        current = self._attr_target_temperature or final_target
+        if abs(final_target - current) <= self._temp_ramp_step:
+            # Klein verschil — direct instellen
+            self._attr_target_temperature = final_target
+            return
+        self._ramp_target = final_target
+        # Zet eerste stap
+        direction = 1 if final_target > current else -1
+        self._attr_target_temperature = round(current + direction * self._temp_ramp_step, 1)
+        self._ramp_cancel = async_track_time_interval(
+            self.hass,
+            self._async_ramp_step,
+            timedelta(minutes=self._temp_ramp_interval),
+        )
+
+    @callback
+    def _async_ramp_step(self, _now=None) -> None:
+        """Elke ramp-interval: één stap richting ramp_target."""
+        if self._ramp_target is None:
+            self._async_cancel_ramp()
+            return
+        current = self._attr_target_temperature or self._ramp_target
+        remaining = self._ramp_target - current
+        if abs(remaining) <= self._temp_ramp_step:
+            # Doel bereikt
+            self._attr_target_temperature = self._ramp_target
+            self._async_cancel_ramp()
+        else:
+            direction = 1 if remaining > 0 else -1
+            self._attr_target_temperature = round(current + direction * self._temp_ramp_step, 1)
+        self.async_write_ha_state()
+        self.hass.async_create_task(self._async_control_heating())
 
     # ------------------------------------------------------------------
     # Presence response
@@ -1209,6 +1347,24 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         current = self._attr_current_temperature
         target = self.effective_target_temperature
 
+        # Feature 3: blokkeer koeling als buiten al koud genoeg is
+        if self._cool_block_outside_temp is not None:
+            outside = self._outside_temp
+            if outside is not None and outside <= self._cool_block_outside_temp:
+                wants_cool_now = self._hvac_mode in (HVACMode.COOL, HVACMode.HEAT_COOL)
+                if wants_cool_now and (self._cooler_on or self._cascade_primary_cool_on):
+                    _LOGGER.info(
+                        "[%s] Koeling geblokkeerd: buiten %.1f°C ≤ %.1f°C drempel",
+                        self.name, outside, self._cool_block_outside_temp,
+                    )
+                    if self._cooler_on:
+                        await self._async_turn_off_cooler()
+                    if self._cascade_primary_cool_on and self._cascade_primary_cooler:
+                        await self._async_switch_primary(self._cascade_primary_cooler, False, "cool")
+                        self._cascade_primary_cool_on = False
+                        self._cascade_primary_start_time = None
+                return
+
         if self._cascade_enabled and (
             self._cascade_primary_heater or self._cascade_primary_cooler
         ):
@@ -1219,6 +1375,23 @@ class SmartClimate(ClimateEntity, RestoreEntity):
             await self._control_pid(current, target)
         elif self._algorithm == ALGORITHM_PREDICTIVE:
             await self._control_predictive(current, target)
+
+        # Feature 7: persistent notification als ruimte doel niet haalt
+        if self._notify_on_delay:
+            active = self._heater_on or self._cooler_on or self._cascade_primary_heat_on or self._cascade_primary_cool_on
+            at_target = not (current < (target - self._cold_tolerance) or current > (target + self._hot_tolerance))
+            if active and not at_target:
+                if self._heat_cool_start_time is None:
+                    self._heat_cool_start_time = dt_util.utcnow()
+                elif not self._notify_sent:
+                    elapsed_min = (dt_util.utcnow() - self._heat_cool_start_time).total_seconds() / 60
+                    if elapsed_min >= self._notify_delay_min:
+                        await self._async_send_delay_notification()
+                        self._notify_sent = True
+            elif at_target and self._notify_sent:
+                await self._async_dismiss_notification()
+                self._notify_sent = False
+                self._heat_cool_start_time = None
 
     # ------------------------------------------------------------------
     # Cascade besturing
@@ -1261,8 +1434,11 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                 if self._cascade_primary_heat_on and self._cascade_primary_start_time:
                     elapsed = (now - self._cascade_primary_start_time).total_seconds() / 60
                     shortfall = target - current
-                    if (elapsed >= self._cascade_timeout_min
-                            and shortfall > self._cascade_temp_threshold
+                    instant = (
+                        self._cascade_instant_threshold is not None
+                        and shortfall > self._cascade_instant_threshold
+                    )
+                    if ((instant or (elapsed >= self._cascade_timeout_min and shortfall > self._cascade_temp_threshold))
                             and not self._cascade_secondary_active):
                         if self._heater_entity_id:
                             await self._async_turn_on_heater()
@@ -1328,8 +1504,11 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                 if self._cascade_primary_cool_on and self._cascade_primary_start_time:
                     elapsed = (now - self._cascade_primary_start_time).total_seconds() / 60
                     shortfall = current - target
-                    if (elapsed >= self._cascade_timeout_min
-                            and shortfall > self._cascade_temp_threshold
+                    instant = (
+                        self._cascade_instant_threshold is not None
+                        and shortfall > self._cascade_instant_threshold
+                    )
+                    if ((instant or (elapsed >= self._cascade_timeout_min and shortfall > self._cascade_temp_threshold))
                             and not self._cascade_secondary_active):
                         if self._cooler_entity_id:
                             await self._async_turn_on_cooler()
@@ -1589,6 +1768,36 @@ class SmartClimate(ClimateEntity, RestoreEntity):
     async def _async_turn_off_all(self) -> None:
         await self._async_turn_off_heater()
         await self._async_turn_off_cooler()
+        # Reset notification state
+        self._notify_sent = False
+        self._heat_cool_start_time = None
+
+    # ------------------------------------------------------------------
+    # Notification helpers (Feature 7)
+    # ------------------------------------------------------------------
+
+    async def _async_send_delay_notification(self) -> None:
+        """Stuur een persistent notification als de ruimte het doel niet haalt."""
+        await self.hass.services.async_call(
+            "persistent_notification",
+            "create",
+            {
+                "title": f"Smart Climate — {self.name}",
+                "message": (
+                    f"De ruimte heeft na {self._notify_delay_min} minuten het "
+                    "ingestelde doel nog niet bereikt."
+                ),
+                "notification_id": NOTIFICATION_ID_PREFIX + (self._attr_unique_id or ""),
+            },
+        )
+
+    async def _async_dismiss_notification(self) -> None:
+        """Verwijder de persistent notification."""
+        await self.hass.services.async_call(
+            "persistent_notification",
+            "dismiss",
+            {"notification_id": NOTIFICATION_ID_PREFIX + (self._attr_unique_id or "")},
+        )
 
     async def _async_switch(self, entity_id: str, turn_on: bool, mode: str = "heat") -> None:
         domain = entity_id.split(".")[0]

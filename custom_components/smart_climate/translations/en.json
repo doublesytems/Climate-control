@@ -55,7 +55,8 @@
           "cascade_primary_cooler": "Primary cooling entity (e.g. AC)",
           "cascade_timeout_min": "Wait time before secondary activates (minutes)",
           "cascade_temp_threshold": "Temperature shortfall to trigger secondary (°C)",
-          "cascade_deactivate_delay_min": "Secondary deactivation delay (minutes)"
+          "cascade_deactivate_delay_min": "Secondary deactivation delay (minutes)",
+          "cascade_instant_threshold": "Instant threshold (°C shortfall → immediate secondary)"
         }
       },
       "pump": {
@@ -77,16 +78,23 @@
         "title": "Advanced options",
         "data": {
           "presence_sensors": "Presence sensors (persons / device trackers)",
+          "window_sensor": "Window sensor (binary_sensor — direct detection)",
           "window_detection": "Enable window detection",
           "window_temp_drop": "Temperature drop threshold (°C)",
           "window_temp_drop_time": "Time window for drop (minutes)",
           "window_open_duration": "Pause duration after detection (minutes)",
+          "cool_block_outside_temp": "Block cooling when outside ≤ (°C, empty = disabled)",
           "weather_compensation": "Enable weather compensation",
           "weather_slope": "Weather compensation slope (°C/°C)",
           "weather_outside_ref": "Reference outside temperature (°C)",
           "heater_watt": "Heater power (Watt)",
           "cooler_watt": "Cooler power (Watt)",
-          "ac_idle_mode": "AC idle mode when target reached"
+          "ac_idle_mode": "AC idle mode when target reached",
+          "temp_ramp_enabled": "Enable gradual temperature transition",
+          "temp_ramp_step": "Step size (°C per step)",
+          "temp_ramp_interval": "Step interval (minutes)",
+          "notify_on_delay": "Notify when target not reached",
+          "notify_delay_min": "Delay before notification (minutes)"
         }
       }
     },
@@ -127,15 +135,49 @@
         "title": "Presence, window, weather & energy",
         "data": {
           "presence_sensors": "Presence sensors",
+          "window_sensor": "Window sensor (binary_sensor)",
           "window_detection": "Window detection",
           "window_temp_drop": "Drop threshold (°C)",
           "window_temp_drop_time": "Time window (min)",
           "window_open_duration": "Pause duration (min)",
+          "cool_block_outside_temp": "Block cooling below (°C)",
           "weather_compensation": "Weather compensation",
           "weather_slope": "Slope",
           "weather_outside_ref": "Reference outside temp (°C)",
           "heater_watt": "Heater power (W)",
-          "cooler_watt": "Cooler power (W)"
+          "cooler_watt": "Cooler power (W)",
+          "ac_idle_mode": "AC idle mode",
+          "temp_ramp_enabled": "Gradual transition",
+          "temp_ramp_step": "Step size (°C)",
+          "temp_ramp_interval": "Step interval (min)",
+          "notify_on_delay": "Notify on delay",
+          "notify_delay_min": "Notification delay (min)"
+        }
+      },
+      "cascade_opt": {
+        "title": "Cascade control",
+        "data": {
+          "cascade_enabled": "Enable cascade",
+          "cascade_primary_heater": "Primary heating entity",
+          "cascade_primary_cooler": "Primary cooling entity",
+          "cascade_timeout_min": "Secondary wait time (min)",
+          "cascade_temp_threshold": "Temperature shortfall threshold (°C)",
+          "cascade_deactivate_delay_min": "Secondary deactivation delay (min)",
+          "cascade_instant_threshold": "Instant threshold (°C)"
+        }
+      },
+      "pump_opt": {
+        "title": "Floor heating pump",
+        "data": {
+          "pump_entity": "Pump relay entity",
+          "pump_zone_entities": "Zone entities",
+          "pump_anti_seize_interval_h": "Anti-seize interval (hours)",
+          "pump_anti_seize_duration_min": "Anti-seize duration (min)",
+          "pump_post_heat_delay_min": "Post-heat run time (min)",
+          "pump_min_run_time_sec": "Minimum run time (s)",
+          "pump_exercise_time": "Preferred exercise time (HH:MM)",
+          "learning_enabled": "Self-learning algorithm",
+          "early_start": "Early start"
         }
       }
     }
