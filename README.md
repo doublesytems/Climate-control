@@ -116,7 +116,48 @@ Bij een preset- of temperatuurwissel klimt de doeltemperatuur stapsgewijs naar h
 | Stapinterval | 5 min | Wachttijd tussen stappen |
 
 ### Persistent notification bij vertraging
-Activeer een melding als de ruimte na een instelbaar aantal minuten het doel nog niet heeft bereikt. De melding verschijnt in Home Assistant en verdwijnt automatisch zodra het doel bereikt is of de thermostaat wordt uitgezet.
+Activeer een melding als de ruimte na een instelbaar aantal minuten het doel nog niet heeft bereikt. De melding verschijnt in Home Assistant en verdwijnt automatisch zodra het doel bereikt is of de thermostaat wordt uitgezet. Optioneel wordt ook een pushbericht gestuurd via een `notify.*`-service (bijv. je mobiele app).
+
+### Vorstbeveiliging
+Stel een minimale temperatuur in (bijv. 5 °C). Als de ruimtetemperatuur hieronder zakt, wordt de verwarming automatisch geactiveerd — ook als de thermostaat op UIT staat. Zo voorkom je bevroren leidingen bij langdurige afwezigheid.
+
+### Sensorfailsafe
+Als de temperatuursensor langer dan de ingestelde tijd geen update geeft (bijv. 30 minuten), schakelt het systeem alle verwarming/koeling uit. Zo voorkom je dat de verwarming doorloopt bij een defecte of gevallen sensor.
+
+### Vochtcomfortcorrectie
+Koppel een luchtvochtigheidssensor. Bij hoge vochtigheid voelt een temperatuur warmer aan, dus de doeltemperatuur wordt automatisch iets verlaagd (en omgekeerd). De correctie is instelbaar met een referentievochtigheid en een comfortfactor (°C per % afwijking).
+
+### Prijsgestuurde setback
+Koppel een energieprijssensor (bijv. Nordpool of ENTSO-E). Als de stroomprijs boven de drempelwaarde stijgt, wordt de doeltemperatuur automatisch verlaagd (bij verwarmen) of verhoogd (bij koelen) met de ingestelde setback-waarde. Bij dalende prijs keert het systeem automatisch terug naar het oorspronkelijke doel.
+
+### Hold mode (tijdelijke temperatuuroverschrijving)
+Overschrijf de doeltemperatuur voor een bepaalde duur via een service. Na afloop keert het systeem automatisch terug naar het vorige doel (preset of schema).
+
+```yaml
+service: smart_climate.set_hold
+target:
+  entity_id: climate.woonkamer
+data:
+  temperature: 22
+  duration: 120   # minuten
+```
+
+```yaml
+service: smart_climate.clear_hold
+target:
+  entity_id: climate.woonkamer
+```
+
+### Seizoensdetectie (auto HEAT/COOL)
+Stel twee drempeltemperaturen in op basis van de buitentemperatuur. Het systeem schakelt automatisch van verwarmings- naar koelingsmodus (en terug) zodra de buitentemperatuur de drempel passeert. Zo hoef je niet handmatig de modus te wisselen bij seizoensovergangen.
+
+| Instelling | Standaard | Beschrijving |
+|-----------|-----------|-------------|
+| Koeldrempel | 22 °C buiten | Boven deze temperatuur → COOL |
+| Verwarmingsdrempel | 18 °C buiten | Onder deze temperatuur → HEAT |
+
+### Vakantiekalender (HA calendar)
+Koppel een Home Assistant calendar-entiteit als vakantiekalender. Als er een actief vakantie-evenement is, schakelt Smart Climate automatisch naar het **Afwezig**-preset. Bij het einde van het evenement keert het systeem terug naar de normale werking.
 
 ### Weerscompensatie
 Past de doeltemperatuur aan op basis van de buitentemperatuur via een instelbare helling. Bij koud weer wordt de stooktemperatuur automatisch verhoogd.
@@ -178,7 +219,7 @@ De integratie wordt ingesteld via een 7-staps wizard in de Home Assistant UI:
 2. **Algoritme** — keuze + basisparameters (tolerantie, min/max temp)
 3. **PID-parameters** — Kp, Ki, Kd (alleen bij PID-algoritme)
 4. **Presets** — temperatuur per preset + boostduur
-5. **Geavanceerd** — aanwezigheid, raamsensor, raamdetectie, koeling blokkeren, weerscompensatie, AC-ruststand, temperatuur ramp, notificatie
+5. **Geavanceerd** — aanwezigheid, raamsensor, raamdetectie, koeling blokkeren, weerscompensatie, AC-ruststand, temperatuur ramp, notificatie, vorstbeveiliging, sensorfailsafe, vochtcorrectie, energieprijssetback, seizoensdetectie, vakantiekalender
 6. **Cascade** — primaire bron (airco), secundaire bron (vloer), wachttijd, drempel, onmiddellijke drempel
 7. **Pomp** — pompentiteit, zones, anti-vastloop, na-looptijd, vroeg starten
 
@@ -210,6 +251,14 @@ De thermostaat-entiteit toont onder andere:
 | `cascade_reason` | Reden van huidige cascade-status |
 | `cascade_secondary_since_min` | Minuten dat secundaire bron actief is |
 | `window_open` | Raam open (sensor of temperatuurval) |
+| `hold_active` | Hold-modus actief |
+| `hold_temp` | Hold doeltemperatuur |
+| `hold_remaining_min` | Resterende holdtijd (min) |
+| `frost_protection_active` | Vorstbeveiliging actief |
+| `humidity_adjustment` | Vochtcorrectie offset (°C) |
+| `price_setback_active` | Prijsgestuurde setback actief |
+| `season_mode` | Automatische modus (HEAT/COOL) |
+| `vacation_active` | Vakantiekalender actief |
 
 ---
 
