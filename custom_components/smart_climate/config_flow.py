@@ -422,7 +422,50 @@ class SmartClimateOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
-        """Step 1 — algorithm & tolerances."""
+        """Stap 1 — apparaat (sensor, verwarming, koeling, buitensensor)."""
+        cur = {**self.config_entry.data, **self.config_entry.options}
+        if user_input is not None:
+            self._data.update(user_input)
+            return await self.async_step_algorithm_opt()
+
+        # Bouw schema — optionele EntitySelectors zonder default=None
+        schema_dict: dict = {
+            vol.Required(CONF_SENSOR, default=cur[CONF_SENSOR]): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
+        }
+        if cur.get(CONF_HEATER):
+            schema_dict[vol.Optional(CONF_HEATER, default=cur[CONF_HEATER])] = selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["switch", "climate", "input_boolean"])
+            )
+        else:
+            schema_dict[vol.Optional(CONF_HEATER)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["switch", "climate", "input_boolean"])
+            )
+        if cur.get(CONF_COOLER):
+            schema_dict[vol.Optional(CONF_COOLER, default=cur[CONF_COOLER])] = selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["switch", "climate", "input_boolean"])
+            )
+        else:
+            schema_dict[vol.Optional(CONF_COOLER)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["switch", "climate", "input_boolean"])
+            )
+        if cur.get(CONF_SENSOR_OUTSIDE):
+            schema_dict[vol.Optional(CONF_SENSOR_OUTSIDE, default=cur[CONF_SENSOR_OUTSIDE])] = selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            )
+        else:
+            schema_dict[vol.Optional(CONF_SENSOR_OUTSIDE)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            )
+        schema_dict[vol.Optional(CONF_AC_MODE, default=cur.get(CONF_AC_MODE, False))] = selector.BooleanSelector()
+
+        return self.async_show_form(step_id="init", data_schema=vol.Schema(schema_dict))
+
+    async def async_step_algorithm_opt(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Stap 2 — algoritme, toleranties en basisparameters."""
         cur = {**self.config_entry.data, **self.config_entry.options}
         if user_input is not None:
             self._data.update(user_input)
@@ -439,6 +482,21 @@ class SmartClimateOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional(CONF_HOT_TOLERANCE, default=cur.get(CONF_HOT_TOLERANCE, DEFAULT_TOLERANCE)): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=0.1, max=5.0, step=0.1, mode="box")
                 ),
+                vol.Optional(CONF_TARGET_TEMP, default=cur.get(CONF_TARGET_TEMP, DEFAULT_TARGET_TEMP)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=5.0, max=40.0, step=0.5, mode="box")
+                ),
+                vol.Optional(CONF_MIN_TEMP, default=cur.get(CONF_MIN_TEMP, DEFAULT_MIN_TEMP)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.0, max=20.0, step=0.5, mode="box")
+                ),
+                vol.Optional(CONF_MAX_TEMP, default=cur.get(CONF_MAX_TEMP, DEFAULT_MAX_TEMP)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=20.0, max=50.0, step=0.5, mode="box")
+                ),
+                vol.Optional(CONF_MIN_CYCLE_DURATION, default=cur.get(CONF_MIN_CYCLE_DURATION, 10)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0, max=300, step=5, mode="box")
+                ),
+                vol.Optional(CONF_KEEP_ALIVE, default=cur.get(CONF_KEEP_ALIVE, 30)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=10, max=300, step=10, mode="box")
+                ),
                 vol.Optional(CONF_PID_KP, default=cur.get(CONF_PID_KP, DEFAULT_PID_KP)): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=0.0, max=100.0, step=0.1, mode="box")
                 ),
@@ -450,7 +508,7 @@ class SmartClimateOptionsFlow(config_entries.OptionsFlow):
                 ),
             }
         )
-        return self.async_show_form(step_id="init", data_schema=schema)
+        return self.async_show_form(step_id="algorithm_opt", data_schema=schema)
 
     async def async_step_presets_opt(
         self, user_input: dict[str, Any] | None = None

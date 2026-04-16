@@ -110,11 +110,26 @@
   "options": {
     "step": {
       "init": {
-        "title": "Algoritme en PID",
+        "title": "Apparaat",
+        "data": {
+          "target_sensor": "Temperatuursensor (binnen)",
+          "heater": "Verwarmingsentiteit (schakelaar of klimaat)",
+          "cooler": "Koelentiteit (schakelaar of klimaat)",
+          "outside_sensor": "Buitentemperatuursensor (optioneel)",
+          "ac_mode": "Airco-modus (verwarmingsentiteit ook voor koeling)"
+        }
+      },
+      "algorithm_opt": {
+        "title": "Algoritme en basisparameters",
         "data": {
           "algorithm": "Regelalgoritme",
           "cold_tolerance": "Koude tolerantie (°C)",
           "hot_tolerance": "Warme tolerantie (°C)",
+          "target_temp": "Doeltemperatuur (°C)",
+          "min_temp": "Minimumtemperatuur (°C)",
+          "max_temp": "Maximumtemperatuur (°C)",
+          "min_cycle_duration": "Minimale schakelcyclus (s)",
+          "keep_alive": "Keep-alive interval (s)",
           "pid_kp": "Kp",
           "pid_ki": "Ki",
           "pid_kd": "Kd"

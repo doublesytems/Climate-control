@@ -110,11 +110,26 @@
   "options": {
     "step": {
       "init": {
-        "title": "Algorithm & PID",
+        "title": "Device",
+        "data": {
+          "target_sensor": "Temperature sensor (indoor)",
+          "heater": "Heater entity (switch or climate)",
+          "cooler": "Cooler entity (switch or climate)",
+          "outside_sensor": "Outside temperature sensor (optional)",
+          "ac_mode": "AC mode (heater entity also used for cooling)"
+        }
+      },
+      "algorithm_opt": {
+        "title": "Algorithm & basic parameters",
         "data": {
           "algorithm": "Control algorithm",
           "cold_tolerance": "Cold tolerance (°C)",
           "hot_tolerance": "Hot tolerance (°C)",
+          "target_temp": "Target temperature (°C)",
+          "min_temp": "Minimum temperature (°C)",
+          "max_temp": "Maximum temperature (°C)",
+          "min_cycle_duration": "Minimum cycle duration (s)",
+          "keep_alive": "Keep-alive interval (s)",
           "pid_kp": "Kp",
           "pid_ki": "Ki",
           "pid_kd": "Kd"
