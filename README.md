@@ -19,7 +19,7 @@ Een geavanceerde HACS custom integration voor Home Assistant met slimme klimaatb
 - **Vroeg starten**: het systeem berekent automatisch wanneer de verwarming moet starten zodat de ruimte precies op temperatuur is bij een schema-wijziging — net zoals Tado
 
 ### Cascade regeling (primaire + secundaire bron)
-De primaire bron (bijv. airco) gaat altijd als eerste aan. De secundaire bron (bijv. vloerverwarming) springt pas bij als de primaire bron het doel niet haalt binnen de ingestelde tijd.
+De primaire bron (bijv. airco) gaat altijd als eerste aan. De secundaire bron (bijv. vloerverwarming) springt pas bij als de primaire bron het doel niet haalt binnen de ingestelde tijd. Gebruik ook zonder secundaire bron (primary-only).
 
 **Voorbeeld tijdlijn** — doeltemperatuur 20 °C, huidig 17 °C:
 ```
@@ -34,6 +34,7 @@ De primaire bron (bijv. airco) gaat altijd als eerste aan. De secundaire bron (b
 | Wachttijd secundaire | 30 min | Hoe lang de primaire bron de kans krijgt |
 | Temperatuurtekort | 1,5 °C | Hoeveel onder doel om secundaire te activeren |
 | Uitschakelvertraging | 10 min | Secundaire nog even aan na bereiken doel |
+| **Onmiddellijke drempel** | 3,0 °C | Bij groter tekort → secundaire meteen aan, zonder wachttijd |
 
 ### Presets
 | Preset | Standaard | Beschrijving |
@@ -77,7 +78,8 @@ data:
 - Herstelt het vorige preset bij thuiskomst
 
 ### Raamdetectie
-- Detecteert een snelle temperatuurdaling (instelbare drempel en tijdvenster)
+- **Raamsensor**: koppel een `binary_sensor` (bijv. een contactschakelaar) rechtstreeks. Zodra de sensor "aan" gaat, stopt de verwarming direct. Bij sluiten hervat hij automatisch.
+- **Temperatuurval**: detecteert een snelle temperatuurdaling (instelbare drempel en tijdvenster) als alternatief zonder sensor
 - Zet de verwarming automatisch uit tijdens het verluchten
 - Hervat na een instelbare pauzetijd
 
@@ -101,6 +103,20 @@ data:
   duration: 60        # minuten
   target_temperature: 24
 ```
+
+### Koeling blokkeren bij lage buitentemperatuur
+Stel een buitentemperatuurdrempel in (bijv. 16 °C). Als het buiten kouder is, wordt koeling volledig geblokkeerd — handig bij airco's die anders onnodig zouden koelen terwijl het buiten al koud is.
+
+### Geleidelijke temperatuurovergang (ramp)
+Bij een preset- of temperatuurwissel klimt de doeltemperatuur stapsgewijs naar het nieuwe doel. Zo gaat de verwarming niet meteen vol aan bij een grote sprong (bijv. Eco → Comfort), maar warmt de ruimte rustig op.
+
+| Instelling | Standaard | Beschrijving |
+|-----------|-----------|-------------|
+| Stapgrootte | 0,5 °C | Temperatuursprong per stap |
+| Stapinterval | 5 min | Wachttijd tussen stappen |
+
+### Persistent notification bij vertraging
+Activeer een melding als de ruimte na een instelbaar aantal minuten het doel nog niet heeft bereikt. De melding verschijnt in Home Assistant en verdwijnt automatisch zodra het doel bereikt is of de thermostaat wordt uitgezet.
 
 ### Weerscompensatie
 Past de doeltemperatuur aan op basis van de buitentemperatuur via een instelbare helling. Bij koud weer wordt de stooktemperatuur automatisch verhoogd.
@@ -162,11 +178,14 @@ De integratie wordt ingesteld via een 7-staps wizard in de Home Assistant UI:
 2. **Algoritme** — keuze + basisparameters (tolerantie, min/max temp)
 3. **PID-parameters** — Kp, Ki, Kd (alleen bij PID-algoritme)
 4. **Presets** — temperatuur per preset + boostduur
-5. **Geavanceerd** — aanwezigheid, raamdetectie, weerscompensatie, vermogen
-6. **Cascade** — primaire bron (airco), secundaire bron (vloer), wachttijd, drempel
+5. **Geavanceerd** — aanwezigheid, raamsensor, raamdetectie, koeling blokkeren, weerscompensatie, AC-ruststand, temperatuur ramp, notificatie
+6. **Cascade** — primaire bron (airco), secundaire bron (vloer), wachttijd, drempel, onmiddellijke drempel
 7. **Pomp** — pompentiteit, zones, anti-vastloop, na-looptijd, vroeg starten
 
-Alle instellingen zijn achteraf te wijzigen via **Integraties → Smart Climate → Configureren**.
+Alle instellingen zijn achteraf te wijzigen via **Integraties → Smart Climate → Configureren** (inclusief cascade- en pompstappen).
+
+### Diagnostics
+Via **Instellingen → Integraties → Smart Climate → Diagnostics** download je een volledig statusoverzicht: actieve modus, cascade-staat, geleerde verwarmingssnelheid, PID-integral, ramp-doel en meer. Handig bij het melden van problemen.
 
 ---
 
@@ -190,6 +209,7 @@ De thermostaat-entiteit toont onder andere:
 | `cascade_secondary_on` | Secundaire bron (vloer) actief |
 | `cascade_reason` | Reden van huidige cascade-status |
 | `cascade_secondary_since_min` | Minuten dat secundaire bron actief is |
+| `window_open` | Raam open (sensor of temperatuurval) |
 
 ---
 
