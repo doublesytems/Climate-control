@@ -232,7 +232,7 @@
       },
       "schedule": {
         "title": "Weekschema",
-        "description": "Voer het schema in — één regel per blok:\n\n`<dagen> <HH:MM> <preset>`\n\nDagen: ma di wo do vr za zo  (bereik: ma-vr  /  kommalijst: ma,wo,vr)\nPresets: comfort · eco · sleep · away\nRegels die beginnen met # worden genegeerd.\nLaat het veld leeg om het schema te wissen.\n\nVoorbeeld:\n```\nma-vr 07:00 comfort\nma-vr 09:00 eco\nma-vr 17:30 comfort\nma-vr 23:00 sleep\nza-zo 08:00 comfort\nza-zo 23:00 sleep\n```",
+        "description": "Voer het schema in — één regel per blok:\n\n[dagen] [HH:MM] [preset]\n\nDagen: ma di wo do vr za zo  (bereik: ma-vr  /  kommalijst: ma,wo,vr)\nPresets: comfort · eco · sleep · away\nRegels die beginnen met # worden genegeerd.\nLaat het veld leeg om het schema te wissen.\n\nVoorbeeld:\n  ma-vr 07:00 comfort\n  ma-vr 09:00 eco\n  ma-vr 17:30 comfort\n  ma-vr 23:00 sleep\n  za-zo 08:00 comfort\n  za-zo 23:00 sleep",
         "data": {
           "schedule_text": "Schema"
         }

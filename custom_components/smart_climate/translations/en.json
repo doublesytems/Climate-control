@@ -232,7 +232,7 @@
       },
       "schedule": {
         "title": "Weekly schedule",
-        "description": "Enter the schedule — one line per block:\n\n`<days> <HH:MM> <preset>`\n\nDays: mo tu we th fr sa su  (range: mo-fr  /  comma list: mo,we,fr)\nPresets: comfort · eco · sleep · away\nLines starting with # are ignored.\nLeave empty to clear the schedule.\n\nExample:\n```\nmo-fr 07:00 comfort\nmo-fr 09:00 eco\nmo-fr 17:30 comfort\nmo-fr 23:00 sleep\nsa-su 08:00 comfort\nsa-su 23:00 sleep\n```",
+        "description": "Enter the schedule — one line per block:\n\n[days] [HH:MM] [preset]\n\nDays: mo tu we th fr sa su  (range: mo-fr  /  comma list: mo,we,fr)\nPresets: comfort · eco · sleep · away\nLines starting with # are ignored.\nLeave empty to clear the schedule.\n\nExample:\n  mo-fr 07:00 comfort\n  mo-fr 09:00 eco\n  mo-fr 17:30 comfort\n  mo-fr 23:00 sleep\n  sa-su 08:00 comfort\n  sa-su 23:00 sleep",
         "data": {
           "schedule_text": "Schedule"
         }
