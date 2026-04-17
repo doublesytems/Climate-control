@@ -916,7 +916,12 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         if self._hold_temp is not None and self._hold_end and dt_util.utcnow() <= self._hold_end:
             return self._hold_temp
         base = self._attr_target_temperature or DEFAULT_TARGET_TEMP
-        adj = self._weather_adj - self._humidity_adj
+        # Weerscompensatie (stooklijn) alleen bij verwarmen — bij koelen werkt de
+        # formule averechts: warm buiten → negatieve offset → koeldoel te laag.
+        adj = 0.0
+        if self._hvac_mode in (HVACMode.HEAT, HVACMode.HEAT_COOL):
+            adj += self._weather_adj
+        adj -= self._humidity_adj
         if self._price_setback_active:
             # Setback: bij verwarmen lager doel, bij koelen hoger doel
             if self._hvac_mode in (HVACMode.HEAT, HVACMode.HEAT_COOL):
