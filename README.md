@@ -127,6 +127,8 @@ Als de temperatuursensor langer dan de ingestelde tijd geen update geeft (bijv. 
 ### Vochtcomfortcorrectie
 Koppel een luchtvochtigheidssensor. Bij hoge vochtigheid voelt een temperatuur warmer aan, dus de doeltemperatuur wordt automatisch iets verlaagd (en omgekeerd). De correctie is instelbaar met een referentievochtigheid en een comfortfactor (°C per % afwijking).
 
+> **Let op:** de vochtcorrectie is alleen actief in pure **verwarmingsmodus (HEAT)**. Bij koelen (COOL / Auto) geldt altijd de ingestelde doeltemperatuur zonder aanpassing.
+
 ### Prijsgestuurde setback
 Koppel een energieprijssensor (bijv. Nordpool of ENTSO-E). Als de stroomprijs boven de drempelwaarde stijgt, wordt de doeltemperatuur automatisch verlaagd (bij verwarmen) of verhoogd (bij koelen) met de ingestelde setback-waarde. Bij dalende prijs keert het systeem automatisch terug naar het oorspronkelijke doel.
 
@@ -160,7 +162,9 @@ Stel twee drempeltemperaturen in op basis van de buitentemperatuur. Het systeem 
 Koppel een Home Assistant calendar-entiteit als vakantiekalender. Als er een actief vakantie-evenement is, schakelt Smart Climate automatisch naar het **Afwezig**-preset. Bij het einde van het evenement keert het systeem terug naar de normale werking.
 
 ### Weerscompensatie
-Past de doeltemperatuur aan op basis van de buitentemperatuur via een instelbare helling. Bij koud weer wordt de stooktemperatuur automatisch verhoogd.
+Past de doeltemperatuur aan op basis van de buitentemperatuur via een instelbare helling (stooklijn). Bij koud weer wordt de stooktemperatuur automatisch verhoogd.
+
+> **Let op:** de weerscompensatie is alleen actief in pure **verwarmingsmodus (HEAT)**. Bij koelen (COOL / Auto) geldt altijd de ingestelde doeltemperatuur zonder aanpassing.
 
 ### Vloerverwarmingspomp
 - **Volgt zones**: pomp aan als een of meer zones verwarmingsvraag hebben
@@ -185,7 +189,16 @@ data:
 |----------|----------|-------------|
 | `climate` | `climate.<naam>` | Thermostaat met presets en HVAC-modi |
 | `sensor` | `sensor.<naam>_verwarmingstijd_vandaag` | Uren verwarming vandaag |
-| `sensor` | `sensor.<naam>_verbruik_verwarming_vandaag` | kWh verbruik vandaag |
+| `sensor` | `sensor.<naam>_koeltijd_vandaag` | Uren koeling vandaag |
+| `sensor` | `sensor.<naam>_verbruik_verwarming_vandaag` | kWh verbruik vandaag (vereist watt > 0) |
+| `sensor` | `sensor.<naam>_verbruik_koeling_vandaag` | kWh koeling vandaag (vereist watt > 0) |
+| `sensor` | `sensor.<naam>_effectieve_doeltemperatuur` | Werkelijk stuurpunt incl. alle correcties (°C) |
+| `sensor` | `sensor.<naam>_verwarmingssnelheid` | Geleerde °C/min (EMA over sessies) |
+| `sensor` | `sensor.<naam>_tijd_tot_doel` | Geschatte minuten tot doeltemperatuur |
+| `sensor` | `sensor.<naam>_volgende_schema` | Volgende schema-overgang (bijv. "do 17:30 → comfort") |
+| `sensor` | `sensor.<naam>_pid_uitvoer` | PID-uitvoerwaarde 0–100 % (alleen PID) |
+| `sensor` | `sensor.<naam>_hold_resterende_tijd` | Resterende minuten hold-modus |
+| `binary_sensor` | `binary_sensor.<naam>_prijssetback_actief` | Aan als prijsgestuurde setback actief is |
 | `number` | `number.<naam>_pid_kp` | PID Kp live aanpasbaar |
 | `number` | `number.<naam>_pid_ki` | PID Ki live aanpasbaar |
 | `number` | `number.<naam>_pid_kd` | PID Kd live aanpasbaar |
