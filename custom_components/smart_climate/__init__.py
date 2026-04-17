@@ -1,6 +1,6 @@
 """Smart Climate — HACS custom integration for Home Assistant.
 
-Platforms  : climate, sensor, number, select
+Platforms  : climate, sensor, binary_sensor, number, select
 Services   : set_boost, clear_boost, set_vacation, clear_vacation,
              set_schedule, clear_schedule
 """
@@ -43,6 +43,7 @@ from .schedule import validate_schedule_entries
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [
+    Platform.BINARY_SENSOR,
     Platform.CLIMATE,
     Platform.SENSOR,
     Platform.NUMBER,
