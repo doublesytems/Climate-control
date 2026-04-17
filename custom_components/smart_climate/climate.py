@@ -45,6 +45,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import (
+    async_call_later,
     async_track_state_change_event,
     async_track_time_change,
     async_track_time_interval,
@@ -197,6 +198,13 @@ from .const import (
     CONF_FORECAST_COOL_BLOCK_HOURS,
     DEFAULT_FORECAST_COOL_BLOCK_THRESHOLD,
     DEFAULT_FORECAST_COOL_BLOCK_HOURS,
+    CONF_MOTION_SENSOR,
+    CONF_MOTION_ACTIVE_PRESET,
+    CONF_MOTION_INACTIVE_PRESET,
+    CONF_MOTION_INACTIVITY_DELAY,
+    DEFAULT_MOTION_ACTIVE_PRESET,
+    DEFAULT_MOTION_INACTIVE_PRESET,
+    DEFAULT_MOTION_INACTIVITY_DELAY,
     DOMAIN,
     EMA_ALPHA,
     PID_OUTPUT_MAX,
@@ -301,6 +309,10 @@ async def async_setup_entry(
         weather_entity=d.get(CONF_WEATHER_ENTITY) or None,
         forecast_cool_block_threshold=float(d[CONF_FORECAST_COOL_BLOCK_THRESHOLD]) if d.get(CONF_FORECAST_COOL_BLOCK_THRESHOLD) is not None else None,
         forecast_cool_block_hours=int(d.get(CONF_FORECAST_COOL_BLOCK_HOURS, DEFAULT_FORECAST_COOL_BLOCK_HOURS)),
+        motion_sensor=d.get(CONF_MOTION_SENSOR) or None,
+        motion_active_preset=d.get(CONF_MOTION_ACTIVE_PRESET, DEFAULT_MOTION_ACTIVE_PRESET),
+        motion_inactive_preset=d.get(CONF_MOTION_INACTIVE_PRESET, DEFAULT_MOTION_INACTIVE_PRESET),
+        motion_inactivity_delay=int(d.get(CONF_MOTION_INACTIVITY_DELAY, DEFAULT_MOTION_INACTIVITY_DELAY)),
     )
 
     # Registreer hold-modus services
@@ -516,6 +528,10 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         weather_entity: str | None = None,
         forecast_cool_block_threshold: float | None = None,
         forecast_cool_block_hours: int = DEFAULT_FORECAST_COOL_BLOCK_HOURS,
+        motion_sensor: str | None = None,
+        motion_active_preset: str = DEFAULT_MOTION_ACTIVE_PRESET,
+        motion_inactive_preset: str = DEFAULT_MOTION_INACTIVE_PRESET,
+        motion_inactivity_delay: int = DEFAULT_MOTION_INACTIVITY_DELAY,
     ) -> None:
         self.hass = hass
         self._config_entry = config_entry
@@ -722,6 +738,14 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         self._forecast_cool_blocked: bool = False
         self._forecast_min_temp: float | None = None
 
+        # Bewegingsdetectie
+        self._motion_sensor = motion_sensor
+        self._motion_active_preset = motion_active_preset
+        self._motion_inactive_preset = motion_inactive_preset
+        self._motion_inactivity_delay = motion_inactivity_delay
+        self._motion_detected: bool = False
+        self._motion_inactivity_cancel = None   # cancel-functie voor inactivity-timer
+
     # ------------------------------------------------------------------
     # Public accessors used by helper entities
     # ------------------------------------------------------------------
@@ -876,6 +900,14 @@ class SmartClimate(ClimateEntity, RestoreEntity):
             self.async_on_remove(
                 async_track_state_change_event(
                     self.hass, [self._vacation_calendar], self._async_calendar_changed
+                )
+            )
+
+        # Track motion sensor
+        if self._motion_sensor:
+            self.async_on_remove(
+                async_track_state_change_event(
+                    self.hass, [self._motion_sensor], self._async_motion_changed
                 )
             )
 
@@ -1056,6 +1088,8 @@ class SmartClimate(ClimateEntity, RestoreEntity):
             attrs["forecast_cool_blocked"] = self._forecast_cool_blocked
             if self._forecast_min_temp is not None:
                 attrs["forecast_min_temp_next_hours"] = round(self._forecast_min_temp, 1)
+        if self._motion_sensor:
+            attrs["motion_detected"] = self._motion_detected
         return attrs
 
     # ------------------------------------------------------------------
@@ -1257,6 +1291,32 @@ class SmartClimate(ClimateEntity, RestoreEntity):
     def _async_presence_changed(self, event) -> None:
         self._update_presence()
         self.hass.async_create_task(self._async_presence_response())
+
+    @callback
+    def _async_motion_changed(self, event) -> None:
+        new_state = event.data.get("new_state")
+        if new_state is None:
+            return
+        is_motion = new_state.state in (STATE_ON, "detected", "true", "True")
+        self._motion_detected = is_motion
+        if is_motion:
+            # Beweging: annuleer inactiviteitsklok en activeer actief preset
+            if self._motion_inactivity_cancel is not None:
+                self._motion_inactivity_cancel()
+                self._motion_inactivity_cancel = None
+            self.hass.async_create_task(self._async_motion_active())
+        else:
+            # Geen beweging: start inactiviteitsklok
+            delay = self._motion_inactivity_delay * 60
+
+            @callback
+            def _inactivity_expired(_now=None) -> None:
+                self._motion_inactivity_cancel = None
+                self.hass.async_create_task(self._async_motion_inactive())
+
+            self._motion_inactivity_cancel = async_call_later(
+                self.hass, delay, _inactivity_expired
+            )
 
     @callback
     def _async_schedule_tick(self, now: datetime) -> None:
@@ -1550,6 +1610,41 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         elif self._presence_detected and self._attr_preset_mode == PRESET_AWAY:
             restore = self._prev_preset if self._prev_preset != PRESET_AWAY else PRESET_COMFORT
             await self.async_set_preset_mode(restore)
+
+    # ------------------------------------------------------------------
+    # Motion detection response
+    # ------------------------------------------------------------------
+
+    async def _async_motion_active(self) -> None:
+        """Beweging gedetecteerd — schakel naar actief preset."""
+        if self._hvac_mode == HVACMode.OFF:
+            return
+        # Niet ingrijpen tijdens boost, vacation, hold of handmatig ingesteld preset
+        if self._attr_preset_mode not in (
+            self._motion_active_preset,
+            self._motion_inactive_preset,
+            PRESET_NONE,
+        ):
+            return
+        if self._attr_preset_mode != self._motion_active_preset:
+            _LOGGER.debug("[%s] Beweging: preset → %s", self.name, self._motion_active_preset)
+            await self.async_set_preset_mode(self._motion_active_preset)
+
+    async def _async_motion_inactive(self) -> None:
+        """Inactiviteitsklok verlopen — schakel naar inactief preset."""
+        if self._hvac_mode == HVACMode.OFF:
+            return
+        if self._attr_preset_mode not in (
+            self._motion_active_preset,
+            self._motion_inactive_preset,
+        ):
+            return
+        if self._attr_preset_mode != self._motion_inactive_preset:
+            _LOGGER.debug(
+                "[%s] Geen beweging voor %d min: preset → %s",
+                self.name, self._motion_inactivity_delay, self._motion_inactive_preset,
+            )
+            await self.async_set_preset_mode(self._motion_inactive_preset)
 
     # ------------------------------------------------------------------
     # Self-learning & early start
@@ -2346,7 +2441,7 @@ class SmartClimate(ClimateEntity, RestoreEntity):
             {"notification_id": NOTIFICATION_ID_PREFIX + (self._attr_unique_id or "")},
         )
 
-    async def _async_switch(self, entity_id: str, turn_on: bool, mode: str = "heat") -> None:
+    async def _async_switch(self, entity_id: str, turn_on: bool, mode: str = "heat", _resend: bool = False) -> None:
         domain = entity_id.split(".")[0]
         if domain in ("switch", "input_boolean"):
             service = "turn_on" if turn_on else "turn_off"
@@ -2388,3 +2483,31 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                     },
                     blocking=True,
                 )
+
+        # Commando-verificatie: controleer na 10s of het commando geland is (eenmalig)
+        if not _resend:
+            expected_on = turn_on
+            _entity_id = entity_id
+            _domain = domain
+
+            @callback
+            def _verify_command(_now=None) -> None:
+                state = self.hass.states.get(_entity_id)
+                if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+                    return
+                if _domain in ("switch", "input_boolean"):
+                    actual_on = state.state == STATE_ON
+                elif _domain == "climate":
+                    actual_on = state.state not in (HVACMode.OFF, STATE_OFF, "off")
+                else:
+                    return
+                if actual_on != expected_on:
+                    _LOGGER.warning(
+                        "[%s] Commando niet geland op %s (verwacht %s, is %s) — eenmalig opnieuw sturen",
+                        self.name, _entity_id, "aan" if expected_on else "uit", state.state,
+                    )
+                    self.hass.async_create_task(
+                        self._async_switch(_entity_id, expected_on, mode, _resend=True)
+                    )
+
+            async_call_later(self.hass, 10, _verify_command)

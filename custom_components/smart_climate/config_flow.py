@@ -134,6 +134,14 @@ from .const import (
     CONF_FORECAST_COOL_BLOCK_HOURS,
     DEFAULT_FORECAST_COOL_BLOCK_THRESHOLD,
     DEFAULT_FORECAST_COOL_BLOCK_HOURS,
+    CONF_MOTION_SENSOR,
+    CONF_MOTION_ACTIVE_PRESET,
+    CONF_MOTION_INACTIVE_PRESET,
+    CONF_MOTION_INACTIVITY_DELAY,
+    DEFAULT_MOTION_ACTIVE_PRESET,
+    DEFAULT_MOTION_INACTIVE_PRESET,
+    DEFAULT_MOTION_INACTIVITY_DELAY,
+    PRESETS,
     DOMAIN,
 )
 from .schedule import (
@@ -760,6 +768,25 @@ class SmartClimateOptionsFlow(config_entries.OptionsFlow):
                 ),
                 vol.Optional(CONF_FORECAST_COOL_BLOCK_HOURS, default=cur.get(CONF_FORECAST_COOL_BLOCK_HOURS, DEFAULT_FORECAST_COOL_BLOCK_HOURS)): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=1, max=48, step=1, mode="box")
+                ),
+                # Bewegingsdetectie
+                **(
+                    {vol.Optional(CONF_MOTION_SENSOR, default=cur[CONF_MOTION_SENSOR]): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain=["binary_sensor"])
+                    )}
+                    if cur.get(CONF_MOTION_SENSOR)
+                    else {vol.Optional(CONF_MOTION_SENSOR): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain=["binary_sensor"])
+                    )}
+                ),
+                vol.Optional(CONF_MOTION_ACTIVE_PRESET, default=cur.get(CONF_MOTION_ACTIVE_PRESET, DEFAULT_MOTION_ACTIVE_PRESET)): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=[p for p in PRESETS if p not in ("schedule", "boost")], mode="dropdown")
+                ),
+                vol.Optional(CONF_MOTION_INACTIVE_PRESET, default=cur.get(CONF_MOTION_INACTIVE_PRESET, DEFAULT_MOTION_INACTIVE_PRESET)): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=[p for p in PRESETS if p not in ("schedule", "boost")], mode="dropdown")
+                ),
+                vol.Optional(CONF_MOTION_INACTIVITY_DELAY, default=cur.get(CONF_MOTION_INACTIVITY_DELAY, DEFAULT_MOTION_INACTIVITY_DELAY)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=1, max=120, step=1, mode="box")
                 ),
             }
         )

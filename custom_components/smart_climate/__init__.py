@@ -37,6 +37,9 @@ from .const import (
     SERVICE_SET_SCHEDULE,
     SERVICE_SET_VACATION,
     SERVICE_PUMP_EXERCISE,
+    SERVICE_SET_ALL_PRESET,
+    SERVICE_ALL_OFF,
+    PRESETS,
 )
 from .schedule import validate_schedule_entries
 
@@ -204,6 +207,22 @@ def _register_services(hass: HomeAssistant) -> None:
         ),
     )
 
+    # ---- set_all_preset --------------------------------------------------
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_ALL_PRESET,
+        _handle_set_all_preset,
+        schema=vol.Schema({vol.Required("preset"): vol.In(PRESETS)}),
+    )
+
+    # ---- set_all_off -----------------------------------------------------
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_ALL_OFF,
+        _handle_set_all_off,
+        schema=vol.Schema({}),
+    )
+
 
 # ---------------------------------------------------------------------------
 # Service handlers
@@ -265,3 +284,33 @@ async def _handle_pump_exercise(call: ServiceCall) -> None:
             await pump.async_trigger_exercise(
                 duration_min=call.data.get("duration")
             )
+
+
+async def _handle_set_all_preset(call: ServiceCall) -> None:
+    """Stel hetzelfde preset in op alle Smart Climate zones."""
+    preset = call.data["preset"]
+    for data in call.hass.data.get(DOMAIN, {}).values():
+        if not isinstance(data, dict):
+            continue
+        entity = data.get("entity")
+        if entity is None:
+            continue
+        try:
+            await entity.async_set_preset_mode(preset)
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning("set_all_preset mislukt voor %s: %s", entity.entity_id, exc)
+
+
+async def _handle_set_all_off(call: ServiceCall) -> None:
+    """Zet alle Smart Climate zones uit."""
+    from homeassistant.components.climate import HVACMode
+    for data in call.hass.data.get(DOMAIN, {}).values():
+        if not isinstance(data, dict):
+            continue
+        entity = data.get("entity")
+        if entity is None:
+            continue
+        try:
+            await entity.async_set_hvac_mode(HVACMode.OFF)
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning("set_all_off mislukt voor %s: %s", entity.entity_id, exc)

@@ -47,6 +47,12 @@ CONF_BOOST_DURATION = "boost_duration"
 # Presence
 CONF_PRESENCE_SENSORS = "presence_sensors"
 
+# Bewegingsdetectie
+CONF_MOTION_SENSOR = "motion_sensor"
+CONF_MOTION_ACTIVE_PRESET = "motion_active_preset"
+CONF_MOTION_INACTIVE_PRESET = "motion_inactive_preset"
+CONF_MOTION_INACTIVITY_DELAY = "motion_inactivity_delay"   # minuten
+
 # Window detection
 CONF_WINDOW_DETECTION = "window_detection"
 CONF_WINDOW_SENSOR = "window_sensor"           # binary_sensor entiteit (directe raamdetekie)
@@ -195,6 +201,9 @@ DEFAULT_TEMP_RAMP_INTERVAL = 5           # minuten per ramp-stap
 DEFAULT_NOTIFY_DELAY_MIN = 60            # minuten wachten voor notificatie
 DEFAULT_FROST_PROTECTION_TEMP = 5.0      # °C — vorst drempel
 DEFAULT_SENSOR_TIMEOUT_MIN = 30          # minuten — sensor mag maximaal stil zijn
+DEFAULT_MOTION_ACTIVE_PRESET = "comfort"
+DEFAULT_MOTION_INACTIVE_PRESET = "eco"
+DEFAULT_MOTION_INACTIVITY_DELAY = 30     # minuten zonder beweging → inactief preset
 DEFAULT_HUMIDITY_REF = 50.0              # % — referentievochtigheid
 DEFAULT_HUMIDITY_FACTOR = 0.05           # °C aanpassing per % afwijking
 DEFAULT_ENERGY_PRICE_THRESHOLD = 0.25    # EUR/kWh — drempel voor dure energie
@@ -286,6 +295,8 @@ SERVICE_CLEAR_VACATION = "clear_vacation"
 SERVICE_SET_SCHEDULE = "set_schedule"
 SERVICE_CLEAR_SCHEDULE = "clear_schedule"
 SERVICE_PUMP_EXERCISE = "trigger_pump_exercise"
+SERVICE_SET_ALL_PRESET = "set_all_preset"
+SERVICE_ALL_OFF = "set_all_off"
 
 # Service attributes
 ATTR_BOOST_DURATION = "duration"

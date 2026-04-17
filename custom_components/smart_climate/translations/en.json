@@ -195,7 +195,11 @@
           "vacation_calendar": "Vacation calendar",
           "weather_entity": "Weather entity (weather.*) for forecast",
           "forecast_cool_block_threshold": "Forecast minimum threshold (°C — block cooling if lower)",
-          "forecast_cool_block_hours": "Forecast look-ahead window (hours)"
+          "forecast_cool_block_hours": "Forecast look-ahead window (hours)",
+          "motion_sensor": "Motion sensor (binary_sensor)",
+          "motion_active_preset": "Preset when motion detected",
+          "motion_inactive_preset": "Preset after inactivity",
+          "motion_inactivity_delay": "Inactivity delay (minutes)"
         }
       },
       "multisplit": {
