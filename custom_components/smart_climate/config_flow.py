@@ -126,6 +126,11 @@ from .const import (
     DEFAULT_WINDOW_TEMP_DROP_TIME,
     DOMAIN,
 )
+from .schedule import (
+    format_schedule_text,
+    parse_schedule_text,
+    validate_schedule_entries,
+)
 
 # ---------------------------------------------------------------------------
 # Step schemas
@@ -787,7 +792,7 @@ class SmartClimateOptionsFlow(config_entries.OptionsFlow):
         cur = {**self.config_entry.data, **self.config_entry.options}
         if user_input is not None:
             self._data.update(user_input)
-            return self.async_create_entry(title="", data=self._data)
+            return await self.async_step_schedule()
 
         schema = vol.Schema(
             {
@@ -824,3 +829,41 @@ class SmartClimateOptionsFlow(config_entries.OptionsFlow):
             }
         )
         return self.async_show_form(step_id="pump_opt", data_schema=schema)
+
+    async def async_step_schedule(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Laatste stap — weekschema via tekstinvoer."""
+        cur = {**self.config_entry.data, **self.config_entry.options}
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            raw_text = user_input.get("schedule_text", "").strip()
+            if raw_text:
+                try:
+                    entries = parse_schedule_text(raw_text)
+                    errs = validate_schedule_entries(entries)
+                    if errs:
+                        errors["schedule_text"] = "invalid_schedule"
+                    else:
+                        self._data["schedule"] = entries
+                except ValueError:
+                    errors["schedule_text"] = "invalid_schedule"
+            else:
+                self._data["schedule"] = []  # schema wissen
+            if not errors:
+                return self.async_create_entry(title="", data=self._data)
+
+        # Huidig schema als tekst tonen
+        existing = cur.get("schedule", [])
+        default_text = format_schedule_text(existing) if existing else ""
+
+        return self.async_show_form(
+            step_id="schedule",
+            data_schema=vol.Schema({
+                vol.Optional("schedule_text", default=default_text): selector.TextSelector(
+                    selector.TextSelectorConfig(multiline=True)
+                ),
+            }),
+            errors=errors,
+        )

@@ -220,7 +220,17 @@
           "learning_enabled": "Self-learning algorithm",
           "early_start": "Early start"
         }
+      },
+      "schedule": {
+        "title": "Weekly schedule",
+        "description": "Enter the schedule — one line per block:\n\n`<days> <HH:MM> <preset>`\n\nDays: mo tu we th fr sa su  (range: mo-fr  /  comma list: mo,we,fr)\nPresets: comfort · eco · sleep · away\nLines starting with # are ignored.\nLeave empty to clear the schedule.\n\nExample:\n```\nmo-fr 07:00 comfort\nmo-fr 09:00 eco\nmo-fr 17:30 comfort\nmo-fr 23:00 sleep\nsa-su 08:00 comfort\nsa-su 23:00 sleep\n```",
+        "data": {
+          "schedule_text": "Schedule"
+        }
       }
+    },
+    "error": {
+      "invalid_schedule": "Invalid schedule input — check day abbreviations (mo tu we th fr sa su), time format (HH:MM) and preset (comfort/eco/sleep/away)."
     }
   },
   "selector": {

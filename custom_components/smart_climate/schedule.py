@@ -152,6 +152,78 @@ class WeekSchedule:
 
 
 # ---------------------------------------------------------------------------
+# Text parser / formatter (voor UI-invoer in options flow)
+# ---------------------------------------------------------------------------
+
+_DAY_MAP: dict[str, int] = {
+    # Nederlands
+    "ma": 0, "di": 1, "wo": 2, "do": 3, "vr": 4, "za": 5, "zo": 6,
+    # English
+    "mo": 0, "tu": 1, "we": 2, "th": 3, "fr": 4, "sa": 5, "su": 6,
+}
+_DAY_NAMES: list[str] = ["ma", "di", "wo", "do", "vr", "za", "zo"]
+
+
+def parse_schedule_text(text: str) -> list[dict[str, Any]]:
+    """Parseert UI-tekst naar een lijst van schedule-entry dicts.
+
+    Formaat per regel:  <dagen> <HH:MM> <preset>
+    Dagen: enkelvoudig (ma), bereik (ma-vr), kommalijst (ma,wo,vr).
+    Regels die beginnen met '#' of leeg zijn worden genegeerd.
+
+    Raises:
+        ValueError: bij een ongeldige regel.
+    """
+    entries: list[dict[str, Any]] = []
+    for lineno, raw in enumerate(text.splitlines(), start=1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) != 3:
+            raise ValueError(
+                f"Regel {lineno}: verwacht '<dagen> <HH:MM> <preset>', "
+                f"maar kreeg '{line}'"
+            )
+        day_str, time_str, preset = parts
+        days: set[int] = set()
+        for segment in day_str.split(","):
+            segment = segment.strip()
+            if "-" in segment:
+                a, b = segment.split("-", 1)
+                start_d = _DAY_MAP.get(a.strip())
+                end_d = _DAY_MAP.get(b.strip())
+                if start_d is None or end_d is None:
+                    raise ValueError(
+                        f"Regel {lineno}: onbekende dag in bereik '{segment}'"
+                    )
+                for d in range(start_d, end_d + 1):
+                    days.add(d)
+            else:
+                d = _DAY_MAP.get(segment)
+                if d is None:
+                    raise ValueError(
+                        f"Regel {lineno}: onbekende dag '{segment}'"
+                    )
+                days.add(d)
+        entries.append({
+            SCHED_DAYS: sorted(days),
+            SCHED_START: time_str,
+            SCHED_PRESET: preset,
+        })
+    return entries
+
+
+def format_schedule_text(entries: list[dict[str, Any]]) -> str:
+    """Formatteert een lijst van entry-dicts terug naar leesbare tekst."""
+    lines: list[str] = []
+    for e in entries:
+        days_str = ",".join(_DAY_NAMES[d] for d in sorted(e.get(SCHED_DAYS, [])))
+        lines.append(f"{days_str} {e.get(SCHED_START, '')} {e.get(SCHED_PRESET, '')}")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Validation helpers
 # ---------------------------------------------------------------------------
 
