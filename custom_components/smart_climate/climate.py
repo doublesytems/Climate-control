@@ -1653,18 +1653,19 @@ class SmartClimate(ClimateEntity, RestoreEntity):
             outside = self._outside_temp
             if outside is not None and outside <= self._cool_block_outside_temp:
                 wants_cool_now = self._hvac_mode in (HVACMode.COOL, HVACMode.HEAT_COOL)
-                if wants_cool_now and (self._cooler_on or self._cascade_primary_cool_on):
-                    _LOGGER.info(
-                        "[%s] Koeling geblokkeerd: buiten %.1f°C ≤ %.1f°C drempel",
-                        self.name, outside, self._cool_block_outside_temp,
-                    )
-                    if self._cooler_on:
-                        await self._async_turn_off_cooler()
-                    if self._cascade_primary_cool_on and self._cascade_primary_cooler:
-                        await self._async_switch_primary(self._cascade_primary_cooler, False, "cool")
-                        self._cascade_primary_cool_on = False
-                        self._cascade_primary_start_time = None
-                return
+                if wants_cool_now:
+                    if self._cooler_on or self._cascade_primary_cool_on:
+                        _LOGGER.info(
+                            "[%s] Koeling geblokkeerd: buiten %.1f°C ≤ %.1f°C drempel",
+                            self.name, outside, self._cool_block_outside_temp,
+                        )
+                        if self._cooler_on:
+                            await self._async_turn_off_cooler()
+                        if self._cascade_primary_cool_on and self._cascade_primary_cooler:
+                            await self._async_switch_primary(self._cascade_primary_cooler, False, "cool")
+                            self._cascade_primary_cool_on = False
+                            self._cascade_primary_start_time = None
+                    return
 
         if self._cascade_enabled and (
             self._cascade_primary_heater or self._cascade_primary_cooler
