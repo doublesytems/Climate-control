@@ -1648,14 +1648,6 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         current = self._attr_current_temperature
         target = self.effective_target_temperature
 
-        # Sync doeltemperatuur naar actieve climate-entiteiten
-        # Dekt preset-wissel, schema-wissel, boost-einde en hold-modus terwijl de actuator
-        # al aan staat — zonder sync blijft de klimaatentiteit op de oude doelwaarde staan.
-        if self._heater_on and self._heater_entity_id:
-            await self._async_update_primary_temperature(self._heater_entity_id)
-        if self._cooler_on and self._cooler_entity_id:
-            await self._async_update_primary_temperature(self._cooler_entity_id)
-
         # Feature 3: blokkeer koeling als buiten al koud genoeg is
         if self._cool_block_outside_temp is not None:
             outside = self._outside_temp
@@ -1685,6 +1677,15 @@ class SmartClimate(ClimateEntity, RestoreEntity):
             await self._control_pid(current, target)
         elif self._algorithm == ALGORITHM_PREDICTIVE:
             await self._control_predictive(current, target)
+
+        # Sync doeltemperatuur naar actieve climate-entiteiten NA het algoritme.
+        # Zo wordt set_temperature alleen gestuurd als de actuator nog aan is — niet
+        # vlak voor een OFF-opdracht, wat sommige integraties (Daikin, Tuya, …) ertoe
+        # brengt de entity te heractiveren waarna de OFF niet goed landt.
+        if self._heater_on and self._heater_entity_id:
+            await self._async_update_primary_temperature(self._heater_entity_id)
+        if self._cooler_on and self._cooler_entity_id:
+            await self._async_update_primary_temperature(self._cooler_entity_id)
 
         # Feature 7: persistent notification als ruimte doel niet haalt
         if self._notify_on_delay:
