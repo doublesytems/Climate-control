@@ -82,6 +82,11 @@ CONF_CASCADE_INSTANT_THRESHOLD = "cascade_instant_threshold"  # °C tekort → m
 # Koeling blokkeren bij lage buitentemperatuur
 CONF_COOL_BLOCK_OUTSIDE_TEMP = "cool_block_outside_temp"
 
+# Voorspellende koelblokkering (weather entity + forecast)
+CONF_WEATHER_ENTITY = "weather_entity"
+CONF_FORECAST_COOL_BLOCK_THRESHOLD = "forecast_cool_block_threshold"
+CONF_FORECAST_COOL_BLOCK_HOURS = "forecast_cool_block_hours"
+
 # Geleidelijke preset-overgang (ramp)
 CONF_TEMP_RAMP = "temp_ramp_enabled"
 CONF_TEMP_RAMP_STEP = "temp_ramp_step"          # °C per stap
@@ -182,6 +187,8 @@ DEFAULT_WINDOW_TEMP_DROP = 1.5   # °C
 DEFAULT_WINDOW_TEMP_DROP_TIME = 5  # minutes
 DEFAULT_WINDOW_OPEN_DURATION = 20  # minutes
 DEFAULT_COOL_BLOCK_OUTSIDE_TEMP = 16.0   # °C — koel niet als buiten al koud
+DEFAULT_FORECAST_COOL_BLOCK_THRESHOLD = 15.0  # °C — min. voorspeld → blokkeer koelen
+DEFAULT_FORECAST_COOL_BLOCK_HOURS = 12        # uren vooruit kijken
 DEFAULT_CASCADE_INSTANT_THRESHOLD = 3.0  # °C tekort → meteen secundaire inschakelen
 DEFAULT_TEMP_RAMP_STEP = 0.5             # °C per ramp-stap
 DEFAULT_TEMP_RAMP_INTERVAL = 5           # minuten per ramp-stap

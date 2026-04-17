@@ -192,7 +192,10 @@
           "auto_mode": "Seizoensdetectie",
           "auto_mode_cool_threshold": "Drempel koelen (°C buiten)",
           "auto_mode_heat_threshold": "Drempel verwarmen (°C buiten)",
-          "vacation_calendar": "Vakantiekalender"
+          "vacation_calendar": "Vakantiekalender",
+          "weather_entity": "Weer-entiteit (weather.*) voor verwachting",
+          "forecast_cool_block_threshold": "Minimumdrempel verwachting (°C — blokkeer koelen als lager)",
+          "forecast_cool_block_hours": "Kijkvenster verwachting (uren vooruit)"
         }
       },
       "multisplit": {

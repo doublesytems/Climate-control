@@ -129,6 +129,11 @@ from .const import (
     CONF_MULTISPLIT_SWITCH_MARGIN,
     DEFAULT_MULTISPLIT_PRIORITY_TEMP,
     DEFAULT_MULTISPLIT_SWITCH_MARGIN,
+    CONF_WEATHER_ENTITY,
+    CONF_FORECAST_COOL_BLOCK_THRESHOLD,
+    CONF_FORECAST_COOL_BLOCK_HOURS,
+    DEFAULT_FORECAST_COOL_BLOCK_THRESHOLD,
+    DEFAULT_FORECAST_COOL_BLOCK_HOURS,
     DOMAIN,
 )
 from .schedule import (
@@ -739,6 +744,22 @@ class SmartClimateOptionsFlow(config_entries.OptionsFlow):
                     else {vol.Optional(CONF_VACATION_CALENDAR): selector.EntitySelector(
                         selector.EntitySelectorConfig(domain="calendar")
                     )}
+                ),
+                # Voorspellende koelblokkering
+                **(
+                    {vol.Optional(CONF_WEATHER_ENTITY, default=cur[CONF_WEATHER_ENTITY]): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain="weather")
+                    )}
+                    if cur.get(CONF_WEATHER_ENTITY)
+                    else {vol.Optional(CONF_WEATHER_ENTITY): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain="weather")
+                    )}
+                ),
+                vol.Optional(CONF_FORECAST_COOL_BLOCK_THRESHOLD, default=cur.get(CONF_FORECAST_COOL_BLOCK_THRESHOLD, DEFAULT_FORECAST_COOL_BLOCK_THRESHOLD)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=5.0, max=25.0, step=0.5, mode="box")
+                ),
+                vol.Optional(CONF_FORECAST_COOL_BLOCK_HOURS, default=cur.get(CONF_FORECAST_COOL_BLOCK_HOURS, DEFAULT_FORECAST_COOL_BLOCK_HOURS)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=1, max=48, step=1, mode="box")
                 ),
             }
         )

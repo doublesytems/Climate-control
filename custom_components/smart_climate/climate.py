@@ -192,6 +192,11 @@ from .const import (
     CONF_MULTISPLIT_SWITCH_MARGIN,
     DEFAULT_MULTISPLIT_PRIORITY_TEMP,
     DEFAULT_MULTISPLIT_SWITCH_MARGIN,
+    CONF_WEATHER_ENTITY,
+    CONF_FORECAST_COOL_BLOCK_THRESHOLD,
+    CONF_FORECAST_COOL_BLOCK_HOURS,
+    DEFAULT_FORECAST_COOL_BLOCK_THRESHOLD,
+    DEFAULT_FORECAST_COOL_BLOCK_HOURS,
     DOMAIN,
     EMA_ALPHA,
     PID_OUTPUT_MAX,
@@ -293,6 +298,9 @@ async def async_setup_entry(
         multisplit_group=d.get(CONF_MULTISPLIT_GROUP) or None,
         multisplit_priority_temp=float(d.get(CONF_MULTISPLIT_PRIORITY_TEMP, DEFAULT_MULTISPLIT_PRIORITY_TEMP)),
         multisplit_switch_margin=float(d.get(CONF_MULTISPLIT_SWITCH_MARGIN, DEFAULT_MULTISPLIT_SWITCH_MARGIN)),
+        weather_entity=d.get(CONF_WEATHER_ENTITY) or None,
+        forecast_cool_block_threshold=float(d[CONF_FORECAST_COOL_BLOCK_THRESHOLD]) if d.get(CONF_FORECAST_COOL_BLOCK_THRESHOLD) is not None else None,
+        forecast_cool_block_hours=int(d.get(CONF_FORECAST_COOL_BLOCK_HOURS, DEFAULT_FORECAST_COOL_BLOCK_HOURS)),
     )
 
     # Registreer hold-modus services
@@ -505,6 +513,9 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         multisplit_group: str | None = None,
         multisplit_priority_temp: float = DEFAULT_MULTISPLIT_PRIORITY_TEMP,
         multisplit_switch_margin: float = DEFAULT_MULTISPLIT_SWITCH_MARGIN,
+        weather_entity: str | None = None,
+        forecast_cool_block_threshold: float | None = None,
+        forecast_cool_block_hours: int = DEFAULT_FORECAST_COOL_BLOCK_HOURS,
     ) -> None:
         self.hass = hass
         self._config_entry = config_entry
@@ -704,6 +715,13 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         self._multisplit_switch_margin = multisplit_switch_margin
         self._multisplit_allowed_mode: str | None = None  # "heat", "cool" or None
 
+        # Voorspellende koelblokkering
+        self._weather_entity = weather_entity
+        self._forecast_cool_block_threshold = forecast_cool_block_threshold
+        self._forecast_cool_block_hours = forecast_cool_block_hours
+        self._forecast_cool_blocked: bool = False
+        self._forecast_min_temp: float | None = None
+
     # ------------------------------------------------------------------
     # Public accessors used by helper entities
     # ------------------------------------------------------------------
@@ -861,6 +879,14 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                 )
             )
 
+        # Track weather entity (voor forecast-gebaseerde koelblokkering)
+        if self._weather_entity and self._forecast_cool_block_threshold is not None:
+            self.async_on_remove(
+                async_track_state_change_event(
+                    self.hass, [self._weather_entity], self._async_weather_changed
+                )
+            )
+
         # Multi-split groepsregistratie
         if self._multisplit_group:
             groups = self.hass.data[DOMAIN].setdefault("_groups", {})
@@ -905,6 +931,10 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                 cal = self.hass.states.get(self._vacation_calendar)
                 if cal:
                     self._update_vacation_calendar(cal)
+            if self._weather_entity and self._forecast_cool_block_threshold is not None:
+                weather_state = self.hass.states.get(self._weather_entity)
+                if weather_state:
+                    self._update_forecast_cool_block(weather_state)
             self._update_presence()
             self.hass.async_create_task(self._async_control_heating())
 
@@ -1022,6 +1052,10 @@ class SmartClimate(ClimateEntity, RestoreEntity):
             attrs["multisplit_group_mode"] = self.hass.data[DOMAIN].get("_groups", {}).get(
                 self._multisplit_group, {}
             ).get("mode")
+        if self._weather_entity and self._forecast_cool_block_threshold is not None:
+            attrs["forecast_cool_blocked"] = self._forecast_cool_blocked
+            if self._forecast_min_temp is not None:
+                attrs["forecast_min_temp_next_hours"] = round(self._forecast_min_temp, 1)
         return attrs
 
     # ------------------------------------------------------------------
@@ -1322,6 +1356,45 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                 self._vacation_end = None
                 _LOGGER.info("[%s] Vakantiekalender: vakantiestand beëindigd", self.name)
                 self.hass.async_create_task(self._async_control_heating())
+
+    def _update_forecast_cool_block(self, state) -> None:
+        """Lees weather forecast en bepaal of koelen geblokkeerd moet worden."""
+        if self._forecast_cool_block_threshold is None or state is None:
+            self._forecast_cool_blocked = False
+            self._forecast_min_temp = None
+            return
+        forecast = state.attributes.get("forecast", [])
+        if not forecast:
+            self._forecast_cool_blocked = False
+            self._forecast_min_temp = None
+            return
+        now = dt_util.utcnow()
+        cutoff = now + timedelta(hours=self._forecast_cool_block_hours)
+        temps = []
+        for entry in forecast:
+            try:
+                dt_str = entry.get("datetime")
+                temp = entry.get("temperature")
+                if dt_str is None or temp is None:
+                    continue
+                entry_dt = dt_util.parse_datetime(dt_str)
+                if entry_dt and now <= entry_dt <= cutoff:
+                    temps.append(float(temp))
+            except (ValueError, TypeError):
+                continue
+        if not temps:
+            self._forecast_cool_blocked = False
+            self._forecast_min_temp = None
+            return
+        self._forecast_min_temp = min(temps)
+        self._forecast_cool_blocked = self._forecast_min_temp < self._forecast_cool_block_threshold
+
+    @callback
+    def _async_weather_changed(self, event) -> None:
+        """Verwerk een statuswijziging van de weather entiteit."""
+        new_state = event.data.get("new_state")
+        self._update_forecast_cool_block(new_state)
+        self.async_write_ha_state()
 
     def _update_presence(self) -> None:
         if not self._presence_sensors:
@@ -1749,6 +1822,25 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                             self._cascade_primary_cool_on = False
                             self._cascade_primary_start_time = None
                     return
+
+        # Voorspellende koelblokkering op basis van weersverwachting
+        if self._forecast_cool_blocked:
+            wants_cool_now = self._hvac_mode in (HVACMode.COOL, HVACMode.HEAT_COOL)
+            if wants_cool_now:
+                if self._cooler_on or self._cascade_primary_cool_on:
+                    _LOGGER.info(
+                        "[%s] Koeling geblokkeerd: verwachte min %.1f°C < drempel %.1f°C in komende %dh",
+                        self.name,
+                        self._forecast_min_temp if self._forecast_min_temp is not None else 0.0,
+                        self._forecast_cool_block_threshold,
+                        self._forecast_cool_block_hours,
+                    )
+                    if self._cooler_on:
+                        await self._async_turn_off_cooler()
+                    if self._cascade_primary_cool_on and self._cascade_primary_cooler:
+                        await self._async_switch_primary(self._cascade_primary_cooler, False, "cool")
+                        self._cascade_primary_cool_on = False
+                return
 
         # Multi-split groepscoördinatie
         if self._multisplit_group:
