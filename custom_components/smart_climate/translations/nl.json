@@ -195,6 +195,15 @@
           "vacation_calendar": "Vakantiekalender"
         }
       },
+      "multisplit": {
+        "title": "Multi-split buitenunit",
+        "description": "Meerdere zones die dezelfde buitenunit delen kunnen niet tegelijk verwarmen en koelen. Geef alle zones in dezelfde groep hetzelfde groep-ID (bijv. 'woning_split'). Laat leeg als deze zone een aparte buitenunit heeft.",
+        "data": {
+          "multisplit_group": "Groep-ID (leeg = niet actief)",
+          "multisplit_priority_temp": "Prioriteitsdrempel (°C afwijking voor directe voorrang)",
+          "multisplit_switch_margin": "Omslagmarge (°C verschil in stemgewicht om van modus te wisselen)"
+        }
+      },
       "cascade_opt": {
         "title": "Cascade regeling",
         "data": {

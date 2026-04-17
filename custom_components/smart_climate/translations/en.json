@@ -195,6 +195,15 @@
           "vacation_calendar": "Vacation calendar"
         }
       },
+      "multisplit": {
+        "title": "Multi-split outdoor unit",
+        "description": "Multiple zones sharing the same outdoor unit cannot heat and cool simultaneously. Give all zones in the same group the same group ID (e.g. 'home_split'). Leave empty if this zone has its own outdoor unit.",
+        "data": {
+          "multisplit_group": "Group ID (empty = disabled)",
+          "multisplit_priority_temp": "Priority threshold (°C deviation for immediate override)",
+          "multisplit_switch_margin": "Switch margin (°C weight difference to change mode)"
+        }
+      },
       "cascade_opt": {
         "title": "Cascade control",
         "data": {

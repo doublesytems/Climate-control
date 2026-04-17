@@ -187,6 +187,11 @@ from .const import (
     ATTR_HOLD_TEMP,
     ATTR_HOLD_DURATION,
     DEFAULT_WINDOW_TEMP_DROP_TIME,
+    CONF_MULTISPLIT_GROUP,
+    CONF_MULTISPLIT_PRIORITY_TEMP,
+    CONF_MULTISPLIT_SWITCH_MARGIN,
+    DEFAULT_MULTISPLIT_PRIORITY_TEMP,
+    DEFAULT_MULTISPLIT_SWITCH_MARGIN,
     DOMAIN,
     EMA_ALPHA,
     PID_OUTPUT_MAX,
@@ -285,6 +290,9 @@ async def async_setup_entry(
         auto_mode_cool_threshold=float(d.get(CONF_AUTO_MODE_COOL_THRESHOLD, DEFAULT_AUTO_MODE_COOL_THRESHOLD)),
         auto_mode_heat_threshold=float(d.get(CONF_AUTO_MODE_HEAT_THRESHOLD, DEFAULT_AUTO_MODE_HEAT_THRESHOLD)),
         vacation_calendar=d.get(CONF_VACATION_CALENDAR),
+        multisplit_group=d.get(CONF_MULTISPLIT_GROUP) or None,
+        multisplit_priority_temp=float(d.get(CONF_MULTISPLIT_PRIORITY_TEMP, DEFAULT_MULTISPLIT_PRIORITY_TEMP)),
+        multisplit_switch_margin=float(d.get(CONF_MULTISPLIT_SWITCH_MARGIN, DEFAULT_MULTISPLIT_SWITCH_MARGIN)),
     )
 
     # Registreer hold-modus services
@@ -494,6 +502,9 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         auto_mode_cool_threshold: float = DEFAULT_AUTO_MODE_COOL_THRESHOLD,
         auto_mode_heat_threshold: float = DEFAULT_AUTO_MODE_HEAT_THRESHOLD,
         vacation_calendar: str | None = None,
+        multisplit_group: str | None = None,
+        multisplit_priority_temp: float = DEFAULT_MULTISPLIT_PRIORITY_TEMP,
+        multisplit_switch_margin: float = DEFAULT_MULTISPLIT_SWITCH_MARGIN,
     ) -> None:
         self.hass = hass
         self._config_entry = config_entry
@@ -687,6 +698,12 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         self._early_start_active: bool = False  # True when heating early for schedule
         self._early_start_target_preset: str | None = None
 
+        # Multi-split groepscoördinatie
+        self._multisplit_group = multisplit_group
+        self._multisplit_priority_temp = multisplit_priority_temp
+        self._multisplit_switch_margin = multisplit_switch_margin
+        self._multisplit_allowed_mode: str | None = None  # "heat", "cool" or None
+
     # ------------------------------------------------------------------
     # Public accessors used by helper entities
     # ------------------------------------------------------------------
@@ -844,6 +861,11 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                 )
             )
 
+        # Multi-split groepsregistratie
+        if self._multisplit_group:
+            groups = self.hass.data[DOMAIN].setdefault("_groups", {})
+            groups.setdefault(self._multisplit_group, {"mode": None})
+
         # Keep-alive interval
         if self._keep_alive:
             self.async_on_remove(
@@ -995,6 +1017,11 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                 )
                 if eta is not None:
                     attrs[ATTR_PREDICTED_REACH_TIME] = round(eta, 1)
+        if self._multisplit_group:
+            attrs["multisplit_group"] = self._multisplit_group
+            attrs["multisplit_group_mode"] = self.hass.data[DOMAIN].get("_groups", {}).get(
+                self._multisplit_group, {}
+            ).get("mode")
         return attrs
 
     # ------------------------------------------------------------------
@@ -1565,6 +1592,56 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         self._session_start_time = None
 
     # ------------------------------------------------------------------
+    # Multi-split groepscoördinatie
+    # ------------------------------------------------------------------
+
+    def _update_multisplit_mode(self) -> str | None:
+        """Bepaal en sla de groepsmodus op. Retourneert 'heat', 'cool' of None."""
+        heat_score = 0.0
+        cool_score = 0.0
+        max_heat_dev = 0.0
+        max_cool_dev = 0.0
+
+        for entry_data in self.hass.data.get(DOMAIN, {}).values():
+            if not isinstance(entry_data, dict):
+                continue
+            entity = entry_data.get("entity")
+            if entity is None or getattr(entity, "_multisplit_group", None) != self._multisplit_group:
+                continue
+            current = entity._attr_current_temperature
+            if current is None:
+                continue
+            try:
+                target = entity.effective_target_temperature
+            except Exception:
+                continue
+            deviation = current - target
+            if deviation > 0.5:                      # te warm → wil koelen
+                cool_score += deviation
+                max_cool_dev = max(max_cool_dev, deviation)
+            elif deviation < -0.5:                   # te koud → wil verwarmen
+                heat_score += abs(deviation)
+                max_heat_dev = max(max_heat_dev, abs(deviation))
+
+        groups = self.hass.data[DOMAIN].setdefault("_groups", {})
+        group = groups.setdefault(self._multisplit_group, {"mode": None})
+        old_mode = group["mode"]
+
+        # Prioriteitsoverschrijving
+        if max_heat_dev >= self._multisplit_priority_temp or max_cool_dev >= self._multisplit_priority_temp:
+            new_mode = "heat" if max_heat_dev >= max_cool_dev else "cool"
+        # Gewogen meerderheid
+        elif heat_score > cool_score + self._multisplit_switch_margin:
+            new_mode = "heat"
+        elif cool_score > heat_score + self._multisplit_switch_margin:
+            new_mode = "cool"
+        else:
+            new_mode = old_mode  # Gelijke stand → huidige modus handhaven
+
+        group["mode"] = new_mode
+        return new_mode
+
+    # ------------------------------------------------------------------
     # Core control loop
     # ------------------------------------------------------------------
 
@@ -1673,6 +1750,26 @@ class SmartClimate(ClimateEntity, RestoreEntity):
                             self._cascade_primary_start_time = None
                     return
 
+        # Multi-split groepscoördinatie
+        if self._multisplit_group:
+            group_mode = self._update_multisplit_mode()
+            self._multisplit_allowed_mode = group_mode
+            # Zet actuatoren uit die de verkeerde richting op zijn
+            if group_mode == "heat":
+                if self._cooler_on:
+                    await self._async_turn_off_cooler()
+                if self._cascade_primary_cool_on and self._cascade_primary_cooler:
+                    await self._async_switch_primary(self._cascade_primary_cooler, False, "cool")
+                    self._cascade_primary_cool_on = False
+            elif group_mode == "cool":
+                if self._heater_on:
+                    await self._async_turn_off_heater()
+                if self._cascade_primary_heat_on and self._cascade_primary_heater:
+                    await self._async_switch_primary(self._cascade_primary_heater, False, "heat")
+                    self._cascade_primary_heat_on = False
+        else:
+            self._multisplit_allowed_mode = None
+
         if self._cascade_enabled and (
             self._cascade_primary_heater or self._cascade_primary_cooler
         ):
@@ -1726,6 +1823,10 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         """
         wants_heat = self._hvac_mode in (HVACMode.HEAT, HVACMode.HEAT_COOL)
         wants_cool = self._hvac_mode in (HVACMode.COOL, HVACMode.HEAT_COOL)
+        if self._multisplit_allowed_mode == "cool":
+            wants_heat = False
+        elif self._multisplit_allowed_mode == "heat":
+            wants_cool = False
 
         too_cold = current < (target - self._cold_tolerance)
         too_hot  = current > (target + self._hot_tolerance)
@@ -1943,6 +2044,10 @@ class SmartClimate(ClimateEntity, RestoreEntity):
     async def _control_hysteresis(self, current: float, target: float) -> None:
         wants_heat = self._hvac_mode in (HVACMode.HEAT, HVACMode.HEAT_COOL)
         wants_cool = self._hvac_mode in (HVACMode.COOL, HVACMode.HEAT_COOL)
+        if self._multisplit_allowed_mode == "cool":
+            wants_heat = False
+        elif self._multisplit_allowed_mode == "heat":
+            wants_cool = False
         can_sw = self._can_switch()  # alleen bewaken bij aanzetten
 
         if wants_heat:
@@ -1968,6 +2073,10 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         on_thresh, off_thresh = 60.0, 40.0
         wants_heat = self._hvac_mode in (HVACMode.HEAT, HVACMode.HEAT_COOL)
         wants_cool = self._hvac_mode in (HVACMode.COOL, HVACMode.HEAT_COOL)
+        if self._multisplit_allowed_mode == "cool":
+            wants_heat = False
+        elif self._multisplit_allowed_mode == "heat":
+            wants_cool = False
         can_sw = self._can_switch()  # alleen bewaken bij aanzetten
 
         if wants_heat:
@@ -1999,6 +2108,10 @@ class SmartClimate(ClimateEntity, RestoreEntity):
 
         wants_heat = self._hvac_mode in (HVACMode.HEAT, HVACMode.HEAT_COOL)
         wants_cool = self._hvac_mode in (HVACMode.COOL, HVACMode.HEAT_COOL)
+        if self._multisplit_allowed_mode == "cool":
+            wants_heat = False
+        elif self._multisplit_allowed_mode == "heat":
+            wants_cool = False
         # Geen vroege return op _can_switch() — uitzetten moet altijd kunnen
 
         if wants_heat:

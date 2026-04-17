@@ -128,6 +128,13 @@ CONF_PUMP_POST_HEAT_DELAY = "pump_post_heat_delay_min"
 CONF_PUMP_MIN_RUN_TIME = "pump_min_run_time_sec"
 CONF_PUMP_EXERCISE_TIME = "pump_exercise_time"
 
+# Multi-split (gedeelde buitenunit)
+CONF_MULTISPLIT_GROUP = "multisplit_group"
+CONF_MULTISPLIT_PRIORITY_TEMP = "multisplit_priority_temp"
+CONF_MULTISPLIT_SWITCH_MARGIN = "multisplit_switch_margin"
+DEFAULT_MULTISPLIT_PRIORITY_TEMP = 3.0   # °C — afwijking voor directe voorrang
+DEFAULT_MULTISPLIT_SWITCH_MARGIN = 1.0   # °C — minimaal verschil om van modus te wisselen
+
 # ---------------------------------------------------------------------------
 # Algorithms
 # ---------------------------------------------------------------------------

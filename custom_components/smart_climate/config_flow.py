@@ -124,6 +124,11 @@ from .const import (
     DEFAULT_WINDOW_OPEN_DURATION,
     DEFAULT_WINDOW_TEMP_DROP,
     DEFAULT_WINDOW_TEMP_DROP_TIME,
+    CONF_MULTISPLIT_GROUP,
+    CONF_MULTISPLIT_PRIORITY_TEMP,
+    CONF_MULTISPLIT_SWITCH_MARGIN,
+    DEFAULT_MULTISPLIT_PRIORITY_TEMP,
+    DEFAULT_MULTISPLIT_SWITCH_MARGIN,
     DOMAIN,
 )
 from .schedule import (
@@ -617,7 +622,7 @@ class SmartClimateOptionsFlow(config_entries.OptionsFlow):
         cur = {**self.config_entry.data, **self.config_entry.options}
         if user_input is not None:
             self._data.update(user_input)
-            return await self.async_step_cascade_opt()
+            return await self.async_step_multisplit()
 
         schema = vol.Schema(
             {
@@ -738,6 +743,32 @@ class SmartClimateOptionsFlow(config_entries.OptionsFlow):
             }
         )
         return self.async_show_form(step_id="advanced_opt", data_schema=schema)
+
+    async def async_step_multisplit(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Step 3b — multi-split buitenunit groepscoördinatie."""
+        cur = {**self.config_entry.data, **self.config_entry.options}
+        if user_input is not None:
+            # Lege string → None (uitgeschakeld)
+            group = user_input.get(CONF_MULTISPLIT_GROUP, "").strip() or None
+            self._data[CONF_MULTISPLIT_GROUP] = group
+            self._data[CONF_MULTISPLIT_PRIORITY_TEMP] = user_input.get(CONF_MULTISPLIT_PRIORITY_TEMP, DEFAULT_MULTISPLIT_PRIORITY_TEMP)
+            self._data[CONF_MULTISPLIT_SWITCH_MARGIN] = user_input.get(CONF_MULTISPLIT_SWITCH_MARGIN, DEFAULT_MULTISPLIT_SWITCH_MARGIN)
+            return await self.async_step_cascade_opt()
+
+        schema = vol.Schema(
+            {
+                vol.Optional(CONF_MULTISPLIT_GROUP, default=cur.get(CONF_MULTISPLIT_GROUP, "")): selector.TextSelector(),
+                vol.Optional(CONF_MULTISPLIT_PRIORITY_TEMP, default=cur.get(CONF_MULTISPLIT_PRIORITY_TEMP, DEFAULT_MULTISPLIT_PRIORITY_TEMP)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=1.0, max=10.0, step=0.5, mode="box")
+                ),
+                vol.Optional(CONF_MULTISPLIT_SWITCH_MARGIN, default=cur.get(CONF_MULTISPLIT_SWITCH_MARGIN, DEFAULT_MULTISPLIT_SWITCH_MARGIN)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.5, max=5.0, step=0.5, mode="box")
+                ),
+            }
+        )
+        return self.async_show_form(step_id="multisplit", data_schema=schema)
 
     async def async_step_cascade_opt(
         self, user_input: dict[str, Any] | None = None
