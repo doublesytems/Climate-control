@@ -1891,7 +1891,19 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         domain = entity_id.split(".")[0]
         if domain == "climate":
             if turn_on:
-                hvac = HVACMode.HEAT if mode == "heat" else HVACMode.COOL
+                if mode == "cool":
+                    state = self.hass.states.get(entity_id)
+                    supported = state.attributes.get("hvac_modes", []) if state else []
+                    if HVACMode.COOL in supported:
+                        hvac = HVACMode.COOL
+                    elif HVACMode.HEAT_COOL in supported:
+                        hvac = HVACMode.HEAT_COOL
+                    elif HVACMode.AUTO in supported:
+                        hvac = HVACMode.AUTO
+                    else:
+                        hvac = HVACMode.COOL
+                else:
+                    hvac = HVACMode.HEAT
                 await self.hass.services.async_call(
                     "climate",
                     "set_hvac_mode",
@@ -1930,20 +1942,21 @@ class SmartClimate(ClimateEntity, RestoreEntity):
     async def _control_hysteresis(self, current: float, target: float) -> None:
         wants_heat = self._hvac_mode in (HVACMode.HEAT, HVACMode.HEAT_COOL)
         wants_cool = self._hvac_mode in (HVACMode.COOL, HVACMode.HEAT_COOL)
-        if not self._can_switch():
-            return
+        can_sw = self._can_switch()  # alleen bewaken bij aanzetten
 
         if wants_heat:
             if current < (target - self._cold_tolerance) and not self._heater_on:
-                await self._async_turn_on_heater()
+                if can_sw:
+                    await self._async_turn_on_heater()
             elif current >= target and self._heater_on:
-                await self._async_turn_off_heater()
+                await self._async_turn_off_heater()      # altijd toegestaan
 
         if wants_cool:
             if current > (target + self._hot_tolerance) and not self._cooler_on:
-                await self._async_turn_on_cooler()
+                if can_sw:
+                    await self._async_turn_on_cooler()
             elif current <= target and self._cooler_on:
-                await self._async_turn_off_cooler()
+                await self._async_turn_off_cooler()      # altijd toegestaan
 
     # ------------------------------------------------------------------
     # Algorithm 2: PID
@@ -1954,21 +1967,22 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         on_thresh, off_thresh = 60.0, 40.0
         wants_heat = self._hvac_mode in (HVACMode.HEAT, HVACMode.HEAT_COOL)
         wants_cool = self._hvac_mode in (HVACMode.COOL, HVACMode.HEAT_COOL)
-        if not self._can_switch():
-            return
+        can_sw = self._can_switch()  # alleen bewaken bij aanzetten
 
         if wants_heat:
             if self._pid_output >= on_thresh and not self._heater_on:
-                await self._async_turn_on_heater()
+                if can_sw:
+                    await self._async_turn_on_heater()
             elif self._pid_output <= off_thresh and self._heater_on:
-                await self._async_turn_off_heater()
+                await self._async_turn_off_heater()      # altijd toegestaan
 
         if wants_cool:
             cool_out = PID_OUTPUT_MAX - self._pid_output
             if cool_out >= on_thresh and not self._cooler_on:
-                await self._async_turn_on_cooler()
+                if can_sw:
+                    await self._async_turn_on_cooler()
             elif cool_out <= off_thresh and self._cooler_on:
-                await self._async_turn_off_cooler()
+                await self._async_turn_off_cooler()      # altijd toegestaan
 
     # ------------------------------------------------------------------
     # Algorithm 3: Predictive
@@ -1984,8 +1998,7 @@ class SmartClimate(ClimateEntity, RestoreEntity):
 
         wants_heat = self._hvac_mode in (HVACMode.HEAT, HVACMode.HEAT_COOL)
         wants_cool = self._hvac_mode in (HVACMode.COOL, HVACMode.HEAT_COOL)
-        if not self._can_switch():
-            return
+        # Geen vroege return op _can_switch() — uitzetten moet altijd kunnen
 
         if wants_heat:
             await self._predictive_heat(current, target)
@@ -1997,26 +2010,28 @@ class SmartClimate(ClimateEntity, RestoreEntity):
         eta_heat = self._hist_heat.minutes_to_reach(current, target)
         if not self._heater_on:
             if current < (target - self._cold_tolerance):
-                if eta_idle is None or eta_idle > 30:
-                    await self._async_turn_on_heater()
+                if self._can_switch():               # aanzetten bewaken
+                    if eta_idle is None or eta_idle > 30:
+                        await self._async_turn_on_heater()
         else:
             if current >= target:
-                await self._async_turn_off_heater()
+                await self._async_turn_off_heater()  # altijd toegestaan
             elif eta_heat is not None and eta_heat <= 2.0:
-                await self._async_turn_off_heater()
+                await self._async_turn_off_heater()  # altijd toegestaan
 
     async def _predictive_cool(self, current: float, target: float) -> None:
         eta_idle = self._hist_idle.minutes_to_reach(current, target)
         eta_cool = self._hist_cool.minutes_to_reach(current, target)
         if not self._cooler_on:
             if current > (target + self._hot_tolerance):
-                if eta_idle is None or eta_idle > 30:
-                    await self._async_turn_on_cooler()
+                if self._can_switch():               # aanzetten bewaken
+                    if eta_idle is None or eta_idle > 30:
+                        await self._async_turn_on_cooler()
         else:
             if current <= target:
-                await self._async_turn_off_cooler()
+                await self._async_turn_off_cooler()  # altijd toegestaan
             elif eta_cool is not None and eta_cool <= 2.0:
-                await self._async_turn_off_cooler()
+                await self._async_turn_off_cooler()  # altijd toegestaan
 
     # ------------------------------------------------------------------
     # Actuator helpers
@@ -2134,7 +2149,19 @@ class SmartClimate(ClimateEntity, RestoreEntity):
             )
         elif domain == "climate":
             if turn_on:
-                hvac_mode = HVACMode.COOL if mode == "cool" else HVACMode.HEAT
+                if mode == "cool":
+                    state = self.hass.states.get(entity_id)
+                    supported = state.attributes.get("hvac_modes", []) if state else []
+                    if HVACMode.COOL in supported:
+                        hvac_mode = HVACMode.COOL
+                    elif HVACMode.HEAT_COOL in supported:
+                        hvac_mode = HVACMode.HEAT_COOL
+                    elif HVACMode.AUTO in supported:
+                        hvac_mode = HVACMode.AUTO
+                    else:
+                        hvac_mode = HVACMode.COOL
+                else:
+                    hvac_mode = HVACMode.HEAT
             elif self._ac_idle_mode == AC_IDLE_FAN_ONLY:
                 hvac_mode = HVACMode.FAN_ONLY
             else:
