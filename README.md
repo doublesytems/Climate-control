@@ -91,6 +91,21 @@ data:
 - Automatically switches to **Away** when everyone is gone
 - Restores the previous preset on return
 
+### Motion detection
+Link a `binary_sensor` (e.g. a PIR sensor) to automatically adjust the preset based on activity in the room — independent of presence detection.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Motion sensor | — | `binary_sensor` entity |
+| Active preset | comfort | Preset applied immediately when motion is detected |
+| Inactive preset | eco | Preset applied after the inactivity delay |
+| Inactivity delay | 30 min | How long to wait after motion stops before switching |
+
+- Motion detected → immediately switch to active preset
+- No motion for the inactivity delay → switch to inactive preset
+- Boost, vacation, hold, and manually selected presets are never overridden
+- State attribute: `motion_detected`
+
 ### Window detection
 - **Window sensor**: link a `binary_sensor` (e.g. a contact switch) directly. When the sensor turns on, heating stops immediately. It resumes automatically when closed.
 - **Temperature drop**: detects a rapid temperature drop (configurable threshold and time window) as an alternative without a sensor
@@ -209,6 +224,24 @@ State attributes on each zone entity:
 - `multisplit_group` — the configured group ID
 - `multisplit_group_mode` — current group decision (`heat` / `cool` / `null`)
 
+### Command resend (reliability)
+After every on/off command to an actuator, Smart Climate checks 10 seconds later whether the device actually changed state. If not, the command is resent once and a warning is logged. This catches devices that occasionally miss a command without any additional configuration.
+
+### Central zone control
+Control all Smart Climate zones at once with two global services:
+
+```yaml
+# Set all zones to the same preset
+service: smart_climate.set_all_preset
+data:
+  preset: away   # comfort / eco / sleep / away / boost
+
+# Turn all zones off
+service: smart_climate.set_all_off
+```
+
+Useful in a "leaving home" automation that sets every room to Away in a single step.
+
 ### Floor heating pump
 - **Follows zones**: pump on when one or more zones have a heating demand
 - **Post-heat run time**: keeps running after all zones close (distributes residual heat)
@@ -276,7 +309,7 @@ The integration is configured via an 8-step wizard in the Home Assistant UI:
 2. **Algorithm** — choice + basic parameters (tolerance, min/max temp)
 3. **PID parameters** — Kp, Ki, Kd (only shown for PID algorithm)
 4. **Presets** — temperature per preset + boost duration
-5. **Advanced** — presence, window sensor, window detection, block cooling, weather compensation, AC idle mode, temperature ramp, notification, frost protection, sensor failsafe, humidity correction, energy price setback, season detection, vacation calendar, weather forecast block
+5. **Advanced** — presence, motion sensor, window sensor, window detection, block cooling, weather compensation, AC idle mode, temperature ramp, notification, frost protection, sensor failsafe, humidity correction, energy price setback, season detection, vacation calendar, weather forecast block
 6. **Multi-split** — group ID, priority threshold, switch margin
 7. **Cascade** — primary source (AC), secondary source (floor), wait time, shortfall threshold, instant threshold
 8. **Pump** — pump entity, zones, anti-seize, post-heat delay, early start
@@ -319,6 +352,7 @@ The thermostat entity exposes among others:
 | `multisplit_group_mode` | Current group decision (heat / cool) |
 | `forecast_cool_blocked` | Cooling blocked by weather forecast |
 | `forecast_min_temp_next_hours` | Lowest forecast temperature in look-ahead window (°C) |
+| `motion_detected` | Motion currently detected by the linked sensor |
 
 ---
 
